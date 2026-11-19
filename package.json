@@ -6,7 +6,12 @@
   "description": "AFTERIMAGE — Non-horror interactive memory essay driven by gaze, blinks, and breath via Presage SmartSpectra SDK.",
   "scripts": {
     "cameras": "node spike/camera-spike.mjs --list",
-    "spike": "node spike/camera-spike.mjs"
+    "spike": "node spike/camera-spike.mjs",
+    "bridge": "node bridge/server.mjs",
+    "dev:web": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "node bridge/server.mjs",
+    "test": "node --test bridge/signal-processor.test.mjs"
   },
   "dependencies": {
     "@smartspectra/node-sdk": "3.5.0",
