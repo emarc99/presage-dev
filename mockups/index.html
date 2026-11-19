@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AFTERIMAGE — UI Direction Explorer (3 Mockups)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .font-editorial { font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif; }
+    .font-ui { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+    .font-tech { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; }
+
+    /* Direction palettes scoped strictly to the preview stage */
+    .theme-a {
+      --st-bg: #0c0b0a;
+      --st-surface: #151311;
+      --st-card: #1b1815;
+      --st-border: #302922;
+      --st-text: #ece6da;
+      --st-muted: #9e9485;
+      --st-accent: #d9822b;
+      --st-accent-soft: rgba(217, 130, 43, 0.14);
+      --st-accent-ink: #130e08;
+      --st-film: #080706;
+      --st-grain: 0.08;
+    }
+    .theme-b {
+      --st-bg: #071322;
+      --st-surface: #0c1d33;
+      --st-card: #102642;
+      --st-border: #20446f;
+      --st-text: #eef3f8;
+      --st-muted: #9bb4ce;
+      --st-accent: #7fd1e8;
+      --st-accent-soft: rgba(127, 209, 232, 0.14);
+      --st-accent-ink: #071322;
+      --st-film: #050d18;
+      --st-grain: 0.05;
+    }
+    .theme-c {
+      --st-bg: #f3efe6;
+      --st-surface: #faf7f0;
+      --st-card: #ffffff;
+      --st-border: #d8d0c1;
+      --st-text: #1d1b18;
+      --st-muted: #686055;
+      --st-accent: #b84a32;
+      --st-accent-soft: rgba(184, 74, 50, 0.10);
+      --st-accent-ink: #faf7f0;
+      --st-film: #ebe4d6;
+      --st-grain: 0.03;
+    }
+
+    .theme-a #sprocket-top {
+      background-image: repeating-linear-gradient(
+        to right,
+        transparent 0px,
+        transparent 16px,
+        rgba(217, 130, 43, 0.16) 16px,
+        rgba(217, 130, 43, 0.16) 24px,
+        transparent 24px,
+        transparent 40px
+      );
+      background-size: 40px 6px;
+      background-repeat: repeat-x;
+      background-position: top;
+    }
+    .theme-b #screen-canvas {
+      background-image: radial-gradient(rgba(127, 209, 232, 0.08) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .theme-c .editorial-mat {
+      box-shadow: 0 2px 10px rgba(29, 27, 24, 0.06);
+    }
+
+    @keyframes shutterWipe {
+      0% { transform: scaleY(0); opacity: 0.95; }
+      45% { transform: scaleY(1); opacity: 1; }
+      55% { transform: scaleY(1); opacity: 1; }
+      100% { transform: scaleY(0); opacity: 0; }
+    }
+    .blink-shutter-active {
+      animation: shutterWipe 340ms cubic-bezier(0.32, 0, 0.22, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] font-ui antialiased m-0 p-4 md:p-6">
+  <div class="max-w-6xl mx-auto space-y-4">
+
+    <!-- Host Chrome Selector Header (uses semantic Antigravity tokens) -->
+    <header class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-tech uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--secondary)] text-[var(--secondary-foreground)]">Mockup Explorer</span>
+          <h1 class="text-base font-semibold tracking-tight text-[var(--foreground)] m-0">AFTERIMAGE — Choose Visual Direction</h1>
+        </div>
+        <p id="dir-summary" class="text-xs text-[var(--muted-foreground)] mt-1 mb-0">
+          Direction A: 35mm Silver-Halide Darkroom — Safelight amber, sprocketed contact edge, warm grain settling into sharp emulsion.
+        </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Art Direction Tabs -->
+        <div class="inline-flex rounded-lg border border-[var(--border)] bg-[var(--background)] p-1 gap-1" role="tablist" aria-label="Art Direction">
+          <button type="button" data-theme-btn="a" class="theme-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer bg-[var(--primary)] text-[var(--primary-foreground)]">
+            A · Silver Darkroom
+          </button>
+          <button type="button" data-theme-btn="b" class="theme-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            B · Cyanotype Print
+          </button>
+          <button type="button" data-theme-btn="c" class="theme-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            C · Linen &amp; Sumi
+          </button>
+        </div>
+
+        <!-- Screen Switcher -->
+        <div class="inline-flex rounded-lg border border-[var(--border)] bg-[var(--background)] p-1 gap-1" role="tablist" aria-label="Screen View">
+          <button type="button" data-screen-btn="setup" class="screen-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            1 · Consent &amp; Silhouette
+          </button>
+          <button type="button" data-screen-btn="canvas" class="screen-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer bg-[var(--primary)] text-[var(--primary-foreground)]">
+            2 · Memory Canvas
+          </button>
+          <button type="button" data-screen-btn="sheet" class="screen-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+            3 · Contact Sheet
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Mockup Stage Container -->
+    <main id="stage" class="theme-a rounded-2xl overflow-hidden transition-colors duration-300" style="background: var(--st-bg); color: var(--st-text); border: 1px solid var(--st-border); box-shadow: 0 24px 60px rgba(0,0,0,0.28);">
+
+      <!-- App Chrome Top Strip -->
+      <div class="px-5 py-3 flex flex-wrap items-center justify-between gap-3" style="background: var(--st-surface); border-bottom: 1px solid var(--st-border);">
+        <div class="flex items-center gap-3">
+          <span class="w-2.5 h-2.5 rounded-full inline-block" style="background: var(--st-accent);"></span>
+          <span class="font-editorial text-lg tracking-wide font-semibold">AFTERIMAGE</span>
+          <span id="chrome-badge" class="font-tech text-xs px-2 py-0.5 rounded" style="background: var(--st-accent-soft); color: var(--st-accent); border: 1px solid var(--st-border);">
+            ROLL 01 · SCENE II / V
+          </span>
+        </div>
+        <div class="flex items-center gap-4 text-xs font-tech" style="color: var(--st-muted);">
+          <span>PRIVACY: ON-DEVICE FACE + BREATH ONLY</span>
+          <span class="hidden sm:inline">·</span>
+          <span id="status-pill" class="px-2 py-0.5 rounded" style="background: var(--st-card); border: 1px solid var(--st-border); color: var(--st-text);">
+            MIC: OFF · CARDIO: OFF
+          </span>
+        </div>
+      </div>
+
+      <!-- Optional Film / Archival Ruler Strip (adapts per direction) -->
+      <div id="sprocket-top" class="h-6 px-5 flex items-center justify-between text-xs font-tech" style="background: var(--st-film); border-bottom: 1px solid var(--st-border); color: var(--st-muted);">
+        <span id="edge-code-left">KODAK TRI-X 400 · 35MM</span>
+        <div id="blink-notches" class="flex items-center gap-1.5">
+          <span class="text-xs opacity-75">BLINK CUTS:</span>
+          <span class="w-2 h-3 rounded-sm inline-block" style="background: var(--st-accent);"></span>
+          <span class="w-2 h-3 rounded-sm inline-block" style="background: var(--st-accent);"></span>
+          <span class="w-2 h-3 rounded-sm inline-block opacity-40" style="background: var(--st-muted);"></span>
+        </div>
+        <span id="edge-code-right">EXP 02A · 960×540 @ 30Hz</span>
+      </div>
+
+      <!-- ==================== SCREEN 1: CONSENT & SILHOUETTE ==================== -->
+      <section id="screen-setup" class="hidden p-5 md:p-7">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+
+          <!-- Left: Consent & Data Transparency -->
+          <div class="lg:col-span-6 rounded-xl p-6 flex flex-col justify-between space-y-5" style="background: var(--st-card); border: 1px solid var(--st-border);">
+            <div class="space-y-3">
+              <div class="font-tech text-xs uppercase tracking-widest" style="color: var(--st-accent);">Before the Camera Opens</div>
+              <h2 class="font-editorial text-2xl font-normal leading-snug m-0">A quiet mirror, never a recording.</h2>
+              <p class="text-sm leading-relaxed m-0" style="color: var(--st-muted);">
+                AFTERIMAGE watches five scenes respond to how you look, blink, and breathe across three minutes. Your camera remains off until you grant consent below.
+              </p>
+
+              <div class="space-y-2.5 pt-2 text-xs">
+                <div class="p-3 rounded-lg" style="background: var(--st-surface); border: 1px solid var(--st-border);">
+                  <div class="font-semibold mb-1">1. Zero Raw Video Saved or Streamed to UI</div>
+                  <div style="color: var(--st-muted);">SmartSpectra processes frames natively in Node at 960×540. Only 478 geometric landmarks and chest-breath scalars cross to the canvas—never pixel video, never microphone audio.</div>
+                </div>
+                <div class="p-3 rounded-lg" style="background: var(--st-surface); border: 1px solid var(--st-border);">
+                  <div class="font-semibold mb-1">2. No Anthropic LLM Insights Telemetry</div>
+                  <div style="color: var(--st-muted);">Requests <code>faceMetrics</code> + <code>breathingMetrics</code> only (omits cardio), keeping breathing inclusive across all skin tones while preventing Presage §7.4 auto-Insights cloud payloads.</div>
+                </div>
+                <div class="p-3 rounded-lg" style="background: var(--st-surface); border: 1px solid var(--st-border);">
+                  <div class="font-semibold mb-1">3. One-Click Erasure</div>
+                  <div style="color: var(--st-muted);">At the Contact Sheet, export your artwork locally as PNG or wipe all session numbers from memory.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-3 flex flex-wrap items-center justify-between gap-3" style="border-top: 1px solid var(--st-border);">
+              <label class="flex items-center gap-2 text-xs cursor-pointer select-none">
+                <input id="consent-check" type="checkbox" checked class="w-4 h-4 rounded" style="accent-color: var(--st-accent);" />
+                <span>I consent to local webcam signal extraction</span>
+              </label>
+              <button type="button" id="btn-begin-session" class="px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-opacity hover:opacity-90" style="background: var(--st-accent); color: var(--st-accent-ink);">
+                Enter Memory I →
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Live 478-Point Wireframe Silhouette -->
+          <div class="lg:col-span-6 rounded-xl p-5 flex flex-col justify-between space-y-4" style="background: var(--st-surface); border: 1px solid var(--st-border);">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-tech text-xs uppercase tracking-wider" style="color: var(--st-muted);">Luminous Silhouette Preview</div>
+                <div class="text-xs mt-0.5" style="color: var(--st-muted);">478 landmarks + upper-chest arc (raw pixels stay inside native SDK)</div>
+              </div>
+              <span class="font-tech text-xs px-2 py-1 rounded" style="background: var(--st-accent-soft); color: var(--st-accent);">READY · 28 Hz</span>
+            </div>
+
+            <div class="relative rounded-lg overflow-hidden flex-1 min-h-[270px]" style="background: var(--st-bg); border: 1px solid var(--st-border);">
+              <canvas id="silhouette-canvas" class="w-full h-full block" width="540" height="300"></canvas>
+              <div class="absolute bottom-2.5 left-3 right-3 flex flex-wrap items-center justify-between gap-2 text-xs font-tech">
+                <span class="px-2 py-1 rounded" style="background: var(--st-card); border: 1px solid var(--st-border);">Framing: Centered</span>
+                <span class="px-2 py-1 rounded" style="background: var(--st-card); border: 1px solid var(--st-border);">Light: Even Front</span>
+                <span class="px-2 py-1 rounded" style="background: var(--st-card); border: 1px solid var(--st-border);">Chest Horizon: Locked</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 text-center font-tech text-xs">
+              <div class="p-2 rounded" style="background: var(--st-card); border: 1px solid var(--st-border);">
+                <div style="color: var(--st-muted);">BLINK GATE</div>
+                <div class="font-semibold mt-0.5">0.21 EAR · CRISP</div>
+              </div>
+              <div class="p-2 rounded" style="background: var(--st-card); border: 1px solid var(--st-border);">
+                <div style="color: var(--st-muted);">GAZE ZONES</div>
+                <div class="font-semibold mt-0.5">L · C · R CALIBRATED</div>
+              </div>
+              <div class="p-2 rounded" style="background: var(--st-card); border: 1px solid var(--st-border);">
+                <div style="color: var(--st-muted);">UPPER TRACE</div>
+                <div class="font-semibold mt-0.5">4s ROLLING BUFFER</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SCREEN 2: LIVE MEMORY CANVAS ==================== -->
+      <section id="screen-canvas" class="p-5 md:p-7 space-y-5">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+
+          <!-- Main Procedural Memory Stage -->
+          <div class="lg:col-span-9 space-y-3">
+            <div class="relative rounded-xl overflow-hidden" style="background: var(--st-film); border: 1px solid var(--st-border);">
+              <canvas id="memory-canvas" class="w-full block" width="840" height="390"></canvas>
+
+              <!-- Eyelid Shutter Wipe Overlay -->
+              <div id="blink-shutter" class="pointer-events-none absolute inset-0 origin-center scale-y-0 opacity-0" style="background: #050505;"></div>
+
+              <!-- Subtle top metadata inside frame -->
+              <div class="pointer-events-none absolute top-3 left-4 right-4 flex items-center justify-between text-xs font-tech">
+                <span class="px-2 py-1 rounded" style="background: rgba(12,11,10,0.68); color: #ece6da; border: 1px solid rgba(255,255,255,0.14);">
+                  II · THE LONG RIDE HOME — BEAT <span id="beat-num">1</span>/3
+                </span>
+                <span id="gaze-focus-tag" class="px-2 py-1 rounded" style="background: rgba(12,11,10,0.68); color: #ece6da; border: 1px solid rgba(255,255,255,0.14);">
+                  FOCUS: CENTER PLATFORM CLOCK
+                </span>
+              </div>
+
+              <!-- Bottom Essay Narration + Breath-Developed Marginalia -->
+              <div class="pointer-events-none absolute bottom-3 left-4 right-4 space-y-2">
+                <div class="p-3.5 rounded-lg backdrop-blur-sm" style="background: rgba(12,11,10,0.72); color: #ece6da; border: 1px solid rgba(255,255,255,0.14);">
+                  <p id="narration-main" class="font-editorial text-base leading-snug m-0">
+                    Rain needles the coach glass while sodium lamps smear across your reflection. Look left to the luggage rack, or steady your breath to read what you almost missed.
+                  </p>
+                  <p id="narration-hidden" class="font-editorial italic text-xs mt-1.5 mb-0 transition-opacity duration-300" style="color: var(--st-accent); opacity: 0.25;">
+                    [Breath too shallow to fix the latent print — settle your exhale to develop hidden marginalia]
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Interactive Mockup Simulator Controls (Demonstrates the 4 Real Presage Inputs) -->
+            <div class="rounded-xl p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center" style="background: var(--st-card); border: 1px solid var(--st-border);">
+              <div class="md:col-span-3 flex items-center gap-2">
+                <button type="button" id="sim-blink-btn" class="w-full px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-transform active:scale-95" style="background: var(--st-accent); color: var(--st-accent-ink);">
+                  Trigger Blink (Cut)
+                </button>
+              </div>
+
+              <div class="md:col-span-3 flex items-center justify-between gap-1.5">
+                <span class="font-tech text-xs" style="color: var(--st-muted);">GAZE</span>
+                <div class="inline-flex rounded-md p-0.5 gap-0.5" style="background: var(--st-surface); border: 1px solid var(--st-border);">
+                  <button type="button" data-gaze="left" class="gaze-btn px-2.5 py-1 rounded text-xs cursor-pointer" style="color: var(--st-muted);">L</button>
+                  <button type="button" data-gaze="center" class="gaze-btn px-2.5 py-1 rounded text-xs font-semibold cursor-pointer" style="background: var(--st-accent-soft); color: var(--st-accent);">C</button>
+                  <button type="button" data-gaze="right" class="gaze-btn px-2.5 py-1 rounded text-xs cursor-pointer" style="color: var(--st-muted);">R</button>
+                </div>
+              </div>
+
+              <div class="md:col-span-4 space-y-1">
+                <div class="flex items-center justify-between text-xs font-tech">
+                  <span style="color: var(--st-muted);">BREATH STEADINESS (4s ROLL)</span>
+                  <span id="breath-pct" style="color: var(--st-accent);">68%</span>
+                </div>
+                <input id="sim-breath" type="range" min="10" max="100" value="68" class="w-full cursor-pointer" style="accent-color: var(--st-accent);" />
+              </div>
+
+              <div class="md:col-span-2 flex items-center justify-end gap-1">
+                <button type="button" data-echo="neutral" class="echo-btn px-2 py-1 rounded text-xs font-tech cursor-pointer" style="background: var(--st-accent-soft); color: var(--st-accent); border: 1px solid var(--st-border);">NEU</button>
+                <button type="button" data-echo="warm" class="echo-btn px-2 py-1 rounded text-xs font-tech cursor-pointer" style="color: var(--st-muted); border: 1px solid var(--st-border);">WRM</button>
+                <button type="button" data-echo="heavy" class="echo-btn px-2 py-1 rounded text-xs font-tech cursor-pointer" style="color: var(--st-muted); border: 1px solid var(--st-border);">HVY</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Telemetry Rail (Minimalist, Honest, Darkroom-Styled) -->
+          <aside class="lg:col-span-3 rounded-xl p-4 flex flex-col justify-between space-y-4" style="background: var(--st-card); border: 1px solid var(--st-border);">
+            <div class="space-y-4">
+              <div>
+                <div class="font-tech text-xs uppercase tracking-wider" style="color: var(--st-muted);">Latent Exposure</div>
+                <div class="mt-2 h-2 rounded-full overflow-hidden" style="background: var(--st-surface); border: 1px solid var(--st-border);">
+                  <div id="exposure-bar" class="h-full transition-all duration-300" style="width: 68%; background: var(--st-accent);"></div>
+                </div>
+                <div class="flex justify-between text-xs font-tech mt-1.5" style="color: var(--st-muted);">
+                  <span>Drift: <strong id="drift-rate" style="color: var(--st-text);">0.52×</strong></span>
+                  <span id="latent-state" style="color: var(--st-accent);">DEVELOPING</span>
+                </div>
+              </div>
+
+              <div class="pt-3" style="border-top: 1px solid var(--st-border);">
+                <div class="flex items-center justify-between text-xs font-tech mb-1.5">
+                  <span style="color: var(--st-muted);">CHEST TRACE (upperTrace)</span>
+                  <span style="color: var(--st-muted);">~1s LAG SAFE</span>
+                </div>
+                <canvas id="breath-ribbon" class="w-full rounded" width="240" height="72" style="background: var(--st-surface); border: 1px solid var(--st-border);"></canvas>
+              </div>
+
+              <div class="pt-3 space-y-2 text-xs font-tech" style="border-top: 1px solid var(--st-border);">
+                <div class="flex justify-between">
+                  <span style="color: var(--st-muted);">BLINK CUTS</span>
+                  <span id="stat-blinks">2</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--st-muted);">LINGER TIME</span>
+                  <span id="stat-hold">18.4 s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--st-muted);">TONAL ECHO</span>
+                  <span id="stat-echo">Neutral</span>
+                </div>
+                <div class="flex justify-between">
+                  <span style="color: var(--st-muted);">RATE CONFIDENCE</span>
+                  <span>84% · Fair</span>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" id="btn-to-sheet" class="w-full py-2 rounded-lg text-xs font-medium cursor-pointer" style="background: var(--st-surface); border: 1px solid var(--st-border); color: var(--st-text);">
+              Develop Contact Sheet →
+            </button>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ==================== SCREEN 3: DEVELOPED CONTACT SHEET ==================== -->
+      <section id="screen-sheet" class="hidden p-5 md:p-7 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4" style="border-bottom: 1px solid var(--st-border);">
+          <div>
+            <div class="font-tech text-xs uppercase tracking-widest" style="color: var(--st-accent);">SESSION ARTIFACT · 5 FRAMES DEVELOPED</div>
+            <h2 class="font-editorial text-2xl font-normal mt-1 mb-0">Your Afterimage Contact Sheet</h2>
+            <p class="text-xs mt-1 mb-0" style="color: var(--st-muted);">
+              Every scene lingered as long as your gaze held steady, developed along your chest breath wave, and cut the moment you blinked.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="btn-export-png" class="px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer" style="background: var(--st-accent); color: var(--st-accent-ink);">
+              Export Contact Sheet (.png)
+            </button>
+            <button type="button" id="btn-wipe-data" class="px-3.5 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background: var(--st-card); border: 1px solid var(--st-border); color: var(--st-text);">
+              Delete Session Data
+            </button>
+          </div>
+        </div>
+
+        <div id="export-banner" class="hidden p-3 rounded-lg text-xs font-tech flex items-center justify-between" style="background: var(--st-accent-soft); border: 1px solid var(--st-border); color: var(--st-accent);">
+          <span id="export-msg">Contact sheet rendered.</span>
+          <button type="button" id="close-banner" class="underline cursor-pointer">Dismiss</button>
+        </div>
+
+        <div id="contact-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"></div>
+      </section>
+
+      <!-- Bottom Film Edge Footer -->
+      <div class="px-5 py-2.5 flex items-center justify-between text-xs font-tech" style="background: var(--st-film); border-top: 1px solid var(--st-border); color: var(--st-muted);">
+        <span>STATIONARY FRAMING · ZERO MICROPHONE · ZERO SAVED FRAMES</span>
+        <span id="direction-footer">DIRECTION A · SILVER-HALIDE DARKROOM</span>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const stage = document.getElementById('stage');
+      const dirSummary = document.getElementById('dir-summary');
+      const dirFooter = document.getElementById('direction-footer');
+      const edgeLeft = document.getElementById('edge-code-left');
+      const edgeRight = document.getElementById('edge-code-right');
+
+      const THEMES = {
+        a: {
+          cls: 'theme-a',
+          summary: 'Direction A: 35mm Silver-Halide Darkroom — Obsidian ground, safelight amber, sprocketed contact edges, warm optical grain clearing into sharp emulsion.',
+          footer: 'DIRECTION A · SILVER-HALIDE DARKROOM',
+          edgeLeft: 'KODAK TRI-X 400 · 35MM',
+          edgeRight: 'EXP 02A · 960×540 @ 30Hz',
+          canvasBg: '#120f0c',
+          canvasAccent: '#e28b35',
+          canvasSecondary: '#c7bda9',
+          canvasTintWarm: 'rgba(217, 130, 43, 0.20)',
+          canvasTintHeavy: 'rgba(38, 46, 56, 0.38)',
+        },
+        b: {
+          cls: 'theme-b',
+          summary: 'Direction B: Cyanotype Sun-Print — Prussian indigo blueprint plates, photographic UV exposure meter, cyan linework emerging from steady breathing.',
+          footer: 'DIRECTION B · CYANOTYPE SUN-PRINT',
+          edgeLeft: 'FERRIC OXALATE PLATE · NO. 02',
+          edgeRight: 'UV EXPOSURE · 960×540 @ 30Hz',
+          canvasBg: '#091a2e',
+          canvasAccent: '#7fd1e8',
+          canvasSecondary: '#d8e9f7',
+          canvasTintWarm: 'rgba(235, 198, 132, 0.16)',
+          canvasTintHeavy: 'rgba(6, 14, 30, 0.45)',
+        },
+        c: {
+          cls: 'theme-c',
+          summary: 'Direction C: Editorial Linen & Sumi Ink — Daylight archival paper, sumi ink hairlines, vermilion shutter chop marks, literary gallery pacing.',
+          footer: 'DIRECTION C · EDITORIAL LINEN & SUMI',
+          edgeLeft: 'ARCHIVAL COTTON RAG · FOLIO II',
+          edgeRight: 'PLATES I–V · 960×540 @ 30Hz',
+          canvasBg: '#efe9dc',
+          canvasAccent: '#b84a32',
+          canvasSecondary: '#23201c',
+          canvasTintWarm: 'rgba(184, 74, 50, 0.14)',
+          canvasTintHeavy: 'rgba(42, 46, 50, 0.25)',
+        },
+      };
+
+      const BEATS = [
+        {
+          main: 'Rain needles the coach glass while sodium lamps smear across your reflection. Look left to the luggage rack, or steady your breath to read what you almost missed.',
+          hidden: 'Marginalia developed: “You packed only one winter coat and left the spare house key under the chipped ceramic pot.”',
+        },
+        {
+          main: 'At the edge of town, the streetlamps thin out into marsh fog. Your reflection sits clearer against the dark glass whenever the carriage pauses between signals.',
+          hidden: 'Marginalia developed: “Nobody waved at platform three, yet two untouched seats stayed warm across from yours.”',
+        },
+        {
+          main: 'Brakes sigh beneath the floorboards. Through the wet pane, morning light catches the station sign a split second before your eyes shut.',
+          hidden: 'Marginalia developed: “The handwritten note in your pocket only made sense once you stopped rereading the first line.”',
+        },
+      ];
+
+      const SCENE_CARDS = [
+        { num: '01', title: 'Threshold at 6:10 AM', hold: '24.2s', blinks: 3, gaze: [22, 62, 16], echo: 'Neutral', waveAmp: 0.72, note: 'Steady inhale before the door clicked.' },
+        { num: '02', title: 'The Long Ride Home', hold: '31.8s', blinks: 2, gaze: [35, 45, 20], echo: 'Warm', waveAmp: 0.88, note: 'Developed hidden line at 78% breath lock.' },
+        { num: '03', title: 'Table by the Window', hold: '19.5s', blinks: 4, gaze: [15, 30, 55], echo: 'Neutral', waveAmp: 0.56, note: 'Gaze lingered right on the sunlit glass.' },
+        { num: '04', title: 'Static Between Stations', hold: '28.0s', blinks: 2, gaze: [48, 38, 14], echo: 'Heavy', waveAmp: 0.65, note: 'Slow drift preserved the final bell.' },
+        { num: '05', title: 'First Light', hold: '36.4s', blinks: 1, gaze: [12, 76, 12], echo: 'Warm', waveAmp: 0.94, note: 'Longest unbroken frame of the roll.' },
+      ];
+
+      const state = {
+        theme: 'a',
+        screen: 'canvas',
+        beat: 0,
+        blinks: 2,
+        gaze: 'center',
+        breath: 68,
+        echo: 'neutral',
+        holdSeconds: 18.4,
+        phase: 0,
+      };
+
+      // Theme Switching
+      document.querySelectorAll('[data-theme-btn]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-theme-btn');
+          state.theme = id;
+          stage.classList.remove('theme-a', 'theme-b', 'theme-c');
+          stage.classList.add(THEMES[id].cls);
+          dirSummary.textContent = THEMES[id].summary;
+          dirFooter.textContent = THEMES[id].footer;
+          edgeLeft.textContent = THEMES[id].edgeLeft;
+          edgeRight.textContent = THEMES[id].edgeRight;
+
+          document.querySelectorAll('[data-theme-btn]').forEach((b) => {
+            const active = b.getAttribute('data-theme-btn') === id;
+            b.className = active
+              ? 'theme-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer bg-[var(--primary)] text-[var(--primary-foreground)]'
+              : 'theme-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]';
+          });
+          renderContactGrid();
+        });
+      });
+
+      // Screen Switching
+      function switchScreen(target) {
+        state.screen = target;
+        ['setup', 'canvas', 'sheet'].forEach((s) => {
+          document.getElementById('screen-' + s).classList.toggle('hidden', s !== target);
+        });
+        document.querySelectorAll('[data-screen-btn]').forEach((b) => {
+          const active = b.getAttribute('data-screen-btn') === target;
+          b.className = active
+            ? 'screen-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer bg-[var(--primary)] text-[var(--primary-foreground)]'
+            : 'screen-tab px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]';
+        });
+      }
+
+      document.querySelectorAll('[data-screen-btn]').forEach((btn) => {
+        btn.addEventListener('click', () => switchScreen(btn.getAttribute('data-screen-btn')));
+      });
+      document.getElementById('btn-begin-session').addEventListener('click', () => switchScreen('canvas'));
+      document.getElementById('btn-to-sheet').addEventListener('click', () => switchScreen('sheet'));
+
+      // Simulator Controls
+      const shutter = document.getElementById('blink-shutter');
+      document.getElementById('sim-blink-btn').addEventListener('click', () => {
+        shutter.classList.remove('blink-shutter-active');
+        void shutter.offsetWidth;
+        shutter.classList.add('blink-shutter-active');
+
+        state.blinks += 1;
+        state.beat = (state.beat + 1) % BEATS.length;
+        state.holdSeconds = Number((state.holdSeconds + 4.2).toFixed(1));
+        document.getElementById('beat-num').textContent = String(state.beat + 1);
+        document.getElementById('stat-blinks').textContent = String(state.blinks);
+        document.getElementById('stat-hold').textContent = state.holdSeconds.toFixed(1) + ' s';
+        updateNarration();
+        renderBlinkNotches();
+      });
+
+      function renderBlinkNotches() {
+        const box = document.getElementById('blink-notches');
+        const pips = [];
+        const total = Math.min(state.blinks + 1, 8);
+        for (let i = 0; i < total; i += 1) {
+          const filled = i < state.blinks;
+          pips.push(
+            `<span class="w-2 h-3 rounded-sm inline-block ${filled ? '' : 'opacity-35'}" style="background:${filled ? 'var(--st-accent)' : 'var(--st-muted)'};"></span>`
+          );
+        }
+        box.innerHTML = `<span class="text-xs opacity-75">BLINK CUTS:</span>${pips.join('')}`;
+      }
+
+      document.querySelectorAll('[data-gaze]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.gaze = btn.getAttribute('data-gaze');
+          document.querySelectorAll('[data-gaze]').forEach((b) => {
+            const active = b.getAttribute('data-gaze') === state.gaze;
+            b.style.background = active ? 'var(--st-accent-soft)' : 'transparent';
+            b.style.color = active ? 'var(--st-accent)' : 'var(--st-muted)';
+            b.style.fontWeight = active ? '600' : '400';
+          });
+          const labelMap = {
+            left: 'FOCUS: LEFT LUGGAGE & WINDOW GLASS',
+            center: 'FOCUS: CENTER PLATFORM CLOCK',
+            right: 'FOCUS: RIGHT PASSING SIGNAGE',
+          };
+          document.getElementById('gaze-focus-tag').textContent = labelMap[state.gaze];
+        });
+      });
+
+      const breathSlider = document.getElementById('sim-breath');
+      breathSlider.addEventListener('input', () => {
+        state.breath = Number(breathSlider.value);
+        document.getElementById('breath-pct').textContent = state.breath + '%';
+        document.getElementById('exposure-bar').style.width = state.breath + '%';
+        const drift = (1.15 - (state.breath / 100) * 0.85).toFixed(2);
+        document.getElementById('drift-rate').textContent = drift + '×';
+        document.getElementById('latent-state').textContent =
+          state.breath >= 62 ? 'DEVELOPED' : state.breath >= 38 ? 'DEVELOPING' : 'HAZY';
+        updateNarration();
+      });
+
+      document.querySelectorAll('[data-echo]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.echo = btn.getAttribute('data-echo');
+          document.querySelectorAll('[data-echo]').forEach((b) => {
+            const active = b.getAttribute('data-echo') === state.echo;
+            b.style.background = active ? 'var(--st-accent-soft)' : 'transparent';
+            b.style.color = active ? 'var(--st-accent)' : 'var(--st-muted)';
+          });
+          const names = { neutral: 'Neutral', warm: 'Warm', heavy: 'Heavy' };
+          document.getElementById('stat-echo').textContent = names[state.echo];
+        });
+      });
+
+      function updateNarration() {
+        const beat = BEATS[state.beat];
+        document.getElementById('narration-main').textContent = beat.main;
+        const hiddenEl = document.getElementById('narration-hidden');
+        if (state.breath >= 62) {
+          hiddenEl.textContent = beat.hidden;
+          hiddenEl.style.opacity = '1';
+        } else {
+          hiddenEl.textContent = '[Breath too shallow to fix the latent print — slide steadiness ≥ 62% to develop hidden marginalia]';
+          hiddenEl.style.opacity = '0.45';
+        }
+      }
+
+      // Render 5-Card Contact Sheet
+      function renderContactGrid() {
+        const grid = document.getElementById('contact-grid');
+        const t = THEMES[state.theme];
+        grid.innerHTML = SCENE_CARDS.map((card, idx) => {
+          const svgWave = Array.from({ length: 28 }, (_, i) => {
+            const x = (i / 27) * 160;
+            const y = 16 + Math.sin(i * 0.55 + idx) * (10 * card.waveAmp);
+            return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+          }).join(' ');
+          return `
+            <article class="rounded-xl p-3 flex flex-col justify-between space-y-2.5" style="background: var(--st-card); border: 1px solid var(--st-border);">
+              <div class="flex items-center justify-between font-tech text-xs" style="color: var(--st-muted);">
+                <span>FRAME ${card.num}A</span>
+                <span>${card.hold}</span>
+              </div>
+              <div class="h-24 rounded-lg relative overflow-hidden flex items-center justify-center p-2" style="background: ${t.canvasBg}; border: 1px solid var(--st-border);">
+                <svg viewBox="0 0 160 32" class="w-full h-8">
+                  <path d="${svgWave}" fill="none" stroke="${t.canvasAccent}" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+                <span class="absolute top-1.5 right-2 font-tech text-xs" style="color: ${t.canvasSecondary}; opacity: 0.75;">${card.blinks} BLINKS</span>
+              </div>
+              <div>
+                <div class="font-editorial text-sm font-medium leading-tight">${card.title}</div>
+                <p class="text-xs mt-1 mb-0 leading-snug" style="color: var(--st-muted);">${card.note}</p>
+              </div>
+              <div class="space-y-1 pt-1">
+                <div class="h-1.5 rounded-full overflow-hidden flex" style="background: var(--st-surface);">
+                  <span style="width:${card.gaze[0]}%; background: var(--st-muted);"></span>
+                  <span style="width:${card.gaze[1]}%; background: var(--st-accent);"></span>
+                  <span style="width:${card.gaze[2]}%; background: var(--st-text); opacity:0.55;"></span>
+                </div>
+                <div class="flex justify-between font-tech text-xs" style="color: var(--st-muted);">
+                  <span>GAZE L/C/R</span>
+                  <span>${card.echo}</span>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('');
+      }
+
+      // Export PNG & Wipe Session handlers (live interactive mockup proof)
+      document.getElementById('btn-export-png').addEventListener('click', () => {
+        const banner = document.getElementById('export-banner');
+        document.getElementById('export-msg').textContent = 'Preview export ready — in the live app this saves a high-res composite contact sheet PNG without any raw camera image.';
+        banner.classList.remove('hidden');
+      });
+      document.getElementById('btn-wipe-data').addEventListener('click', () => {
+        state.blinks = 0;
+        state.holdSeconds = 0;
+        document.getElementById('stat-blinks').textContent = '0';
+        document.getElementById('stat-hold').textContent = '0.0 s';
+        renderBlinkNotches();
+        const banner = document.getElementById('export-banner');
+        document.getElementById('export-msg').textContent = 'In-memory session counters wiped cleanly.';
+        banner.classList.remove('hidden');
+      });
+      document.getElementById('close-banner').addEventListener('click', () => {
+        document.getElementById('export-banner').classList.add('hidden');
+      });
+
+      // Procedural Canvas Animations (Silhouette + Memory Triptych + Breath Ribbon)
+      const silCanvas = document.getElementById('silhouette-canvas');
+      const silCtx = silCanvas.getContext('2d');
+      const memCanvas = document.getElementById('memory-canvas');
+      const memCtx = memCanvas.getContext('2d');
+      const ribCanvas = document.getElementById('breath-ribbon');
+      const ribCtx = ribCanvas.getContext('2d');
+
+      function drawSilhouette(t) {
+        const w = silCanvas.width;
+        const h = silCanvas.height;
+        const th = THEMES[state.theme];
+        silCtx.fillStyle = th.canvasBg;
+        silCtx.fillRect(0, 0, w, h);
+
+        // Subtle framing reticle
+        silCtx.strokeStyle = th.canvasSecondary;
+        silCtx.globalAlpha = 0.16;
+        silCtx.lineWidth = 1;
+        silCtx.strokeRect(48, 22, w - 96, h - 44);
+        silCtx.globalAlpha = 1;
+
+        const cx = w / 2;
+        const cy = h * 0.43;
+        const breathLift = Math.sin(t * 1.4) * 5;
+
+        // Wireframe oval landmarks
+        silCtx.strokeStyle = th.canvasAccent;
+        silCtx.lineWidth = 1.4;
+        silCtx.beginPath();
+        silCtx.ellipse(cx, cy, 46, 62, 0, 0, Math.PI * 2);
+        silCtx.stroke();
+
+        // Scattered 478-landmark feel points
+        silCtx.fillStyle = th.canvasSecondary;
+        for (let i = 0; i < 42; i += 1) {
+          const ang = (i / 42) * Math.PI * 2;
+          const rX = (i % 3 === 0 ? 34 : 44) * Math.sin(i * 1.7 + 0.8);
+          const rY = (i % 2 === 0 ? 48 : 26) * Math.cos(i * 1.1);
+          silCtx.globalAlpha = 0.45;
+          silCtx.beginPath();
+          silCtx.arc(cx + rX * 0.85, cy + rY * 0.85, 1.5, 0, Math.PI * 2);
+          silCtx.fill();
+        }
+        silCtx.globalAlpha = 1;
+
+        // Iris pair
+        [-17, 17].forEach((dx) => {
+          silCtx.strokeStyle = th.canvasAccent;
+          silCtx.beginPath();
+          silCtx.ellipse(cx + dx, cy - 10, 9, 4.5, 0, 0, Math.PI * 2);
+          silCtx.stroke();
+          silCtx.fillStyle = th.canvasAccent;
+          silCtx.beginPath();
+          silCtx.arc(cx + dx, cy - 10, 2.2, 0, Math.PI * 2);
+          silCtx.fill();
+        });
+
+        // Chest horizon & diaphragm wave
+        silCtx.strokeStyle = th.canvasAccent;
+        silCtx.lineWidth = 1.6;
+        silCtx.beginPath();
+        silCtx.moveTo(cx - 105, h - 32);
+        silCtx.quadraticCurveTo(cx, h - 78 + breathLift, cx + 105, h - 32);
+        silCtx.stroke();
+      }
+
+      function drawMemoryScene(t) {
+        const w = memCanvas.width;
+        const h = memCanvas.height;
+        const th = THEMES[state.theme];
+        const clarity = state.breath / 100;
+        const driftSpeed = 1.15 - clarity * 0.85;
+        state.phase += 0.014 * driftSpeed;
+
+        memCtx.fillStyle = th.canvasBg;
+        memCtx.fillRect(0, 0, w, h);
+
+        // Gaze parallax shift
+        const gazeShift = state.gaze === 'left' ? 42 : state.gaze === 'right' ? -42 : 0;
+
+        // Moving horizon & distant station lights
+        for (let i = 0; i < 14; i += 1) {
+          const px = ((i * 115 - state.phase * 90 + gazeShift + 1400) % (w + 180)) - 90;
+          const py = 128 + (i % 3) * 18;
+          const rad = 18 + (1 - clarity) * 26;
+          const grad = memCtx.createRadialGradient(px, py, 2, px, py, rad);
+          grad.addColorStop(0, th.canvasAccent);
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          memCtx.globalAlpha = 0.25 + clarity * 0.35;
+          memCtx.fillStyle = grad;
+          memCtx.beginPath();
+          memCtx.arc(px, py, rad, 0, Math.PI * 2);
+          memCtx.fill();
+        }
+        memCtx.globalAlpha = 1;
+
+        // Triptych train window frames (Left / Center / Right focus planes)
+        const panes = [
+          { key: 'left', x: 38, pw: 225, label: 'LUGGAGE' },
+          { key: 'center', x: 295, pw: 250, label: 'CLOCK 00:42' },
+          { key: 'right', x: 577, pw: 225, label: 'SIGNAGE' },
+        ];
+
+        panes.forEach((p) => {
+          const focused = p.key === state.gaze;
+          memCtx.strokeStyle = focused ? th.canvasAccent : th.canvasSecondary;
+          memCtx.globalAlpha = focused ? 0.82 : 0.25;
+          memCtx.lineWidth = focused ? 2 : 1;
+          memCtx.strokeRect(p.x + gazeShift * 0.15, 52, p.pw, 210);
+
+          // Procedural silhouette details inside each pane
+          memCtx.beginPath();
+          if (p.key === 'center') {
+            memCtx.arc(p.x + p.pw / 2 + gazeShift * 0.15, 138, 28, 0, Math.PI * 2);
+            memCtx.moveTo(p.x + p.pw / 2 + gazeShift * 0.15, 138);
+            memCtx.lineTo(p.x + p.pw / 2 + gazeShift * 0.15, 120);
+            memCtx.moveTo(p.x + p.pw / 2 + gazeShift * 0.15, 138);
+            memCtx.lineTo(p.x + p.pw / 2 + 14 + gazeShift * 0.15, 138);
+          } else if (p.key === 'left') {
+            memCtx.rect(p.x + 48 + gazeShift * 0.15, 108, 124, 52);
+            memCtx.moveTo(p.x + 88 + gazeShift * 0.15, 108);
+            memCtx.lineTo(p.x + 88 + gazeShift * 0.15, 96);
+            memCtx.lineTo(p.x + 132 + gazeShift * 0.15, 96);
+            memCtx.lineTo(p.x + 132 + gazeShift * 0.15, 108);
+          } else {
+            memCtx.moveTo(p.x + 40 + gazeShift * 0.15, 130);
+            memCtx.lineTo(p.x + 185 + gazeShift * 0.15, 130);
+            memCtx.moveTo(p.x + 60 + gazeShift * 0.15, 152);
+            memCtx.lineTo(p.x + 150 + gazeShift * 0.15, 152);
+          }
+          memCtx.stroke();
+        });
+        memCtx.globalAlpha = 1;
+
+        // Rain streaks on glass
+        memCtx.strokeStyle = th.canvasSecondary;
+        memCtx.globalAlpha = 0.22;
+        memCtx.lineWidth = 1;
+        for (let r = 0; r < 24; r += 1) {
+          const rx = ((r * 37 + t * 18) % w);
+          const ry = ((r * 53 + t * 85) % (h - 60));
+          memCtx.beginPath();
+          memCtx.moveTo(rx, ry);
+          memCtx.lineTo(rx - 4, ry + 16);
+          memCtx.stroke();
+        }
+        memCtx.globalAlpha = 1;
+
+        // Breath haze veil when steadiness is low
+        const hazeAlpha = Math.max(0, (1 - clarity) * 0.52);
+        if (hazeAlpha > 0.02) {
+          memCtx.fillStyle = state.theme === 'c' ? `rgba(243,239,230,${hazeAlpha})` : `rgba(8,10,14,${hazeAlpha})`;
+          memCtx.fillRect(0, 0, w, h);
+        }
+
+        // Tonal echo overlay
+        if (state.echo === 'warm') {
+          memCtx.fillStyle = th.canvasTintWarm;
+          memCtx.fillRect(0, 0, w, h);
+        } else if (state.echo === 'heavy') {
+          memCtx.fillStyle = th.canvasTintHeavy;
+          memCtx.fillRect(0, 0, w, h);
+        }
+      }
+
+      function drawBreathRibbon(t) {
+        const w = ribCanvas.width;
+        const h = ribCanvas.height;
+        const th = THEMES[state.theme];
+        ribCtx.fillStyle = th.canvasBg;
+        ribCtx.fillRect(0, 0, w, h);
+
+        const steady = state.breath / 100;
+        const jitter = (1 - steady) * 10;
+        ribCtx.strokeStyle = th.canvasAccent;
+        ribCtx.lineWidth = 2;
+        ribCtx.beginPath();
+        for (let x = 0; x <= w; x += 3) {
+          const baseWave = Math.sin(x * 0.045 - t * 2.2) * (14 + steady * 8);
+          const noise = Math.sin(x * 0.28 + t * 9.0) * jitter;
+          const y = h / 2 + baseWave + noise;
+          if (x === 0) ribCtx.moveTo(x, y);
+          else ribCtx.lineTo(x, y);
+        }
+        ribCtx.stroke();
+      }
+
+      function loop(ms) {
+        const t = ms * 0.001;
+        if (state.screen === 'setup') drawSilhouette(t);
+        if (state.screen === 'canvas') {
+          drawMemoryScene(t);
+          drawBreathRibbon(t);
+        }
+        requestAnimationFrame(loop);
+      }
+
+      updateNarration();
+      renderContactGrid();
+      requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
