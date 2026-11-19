@@ -40,6 +40,7 @@ function loadEnvFile(envPath) {
 function parseArgs(argv) {
   const opts = {
     list: false,
+    skipReadiness: false,
     cameraId: null,
     file: null,
     seconds: 20,
@@ -48,6 +49,8 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === '--list') {
       opts.list = true;
+    } else if (arg === '--skip-readiness') {
+      opts.skipReadiness = true;
     } else if (arg === '--camera-id' && argv[i + 1]) {
       opts.cameraId = argv[++i];
     } else if (arg === '--file' && argv[i + 1]) {
@@ -140,9 +143,13 @@ async function main() {
     sdk.useCamera(selection, { width: 960, height: 540, fps: 30 });
   }
 
-  console.log('Running checkDeviceReadiness()...');
-  const readiness = await sdk.checkDeviceReadiness();
-  console.log('Readiness:', JSON.stringify(readiness));
+  if (!opts.skipReadiness) {
+    console.log('Running checkDeviceReadiness()...');
+    const readiness = await sdk.checkDeviceReadiness();
+    console.log('Readiness:', JSON.stringify(readiness));
+  } else {
+    console.log('Skipping checkDeviceReadiness() (--skip-readiness).');
+  }
 
   // Rolling 1-second diagnostic bucket
   let packetCount = 0;
@@ -285,9 +292,12 @@ async function main() {
     console.log(`\nStopping (${reason})...`);
     try {
       await sdk.stopAsync();
+      if (typeof sdk.destroy === 'function') {
+        await sdk.destroy();
+      }
       console.log('SDK stopped cleanly.');
     } catch (err) {
-      console.error('stopAsync error:', err?.message || err);
+      console.error('stopAsync/destroy error:', err?.message || err);
     }
   }
 
@@ -301,6 +311,7 @@ async function main() {
 
   setTimeout(async () => {
     await shutdown(`${opts.seconds}s complete`);
+    process.exit(0);
   }, opts.seconds * 1000);
 }
 
