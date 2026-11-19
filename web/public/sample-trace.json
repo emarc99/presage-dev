@@ -1,0 +1,31 @@
+{
+  "kind": "sample_preview",
+  "note": "Deterministic 2.5-minute sample SmartSpectra trace for Vercel zero-install preview. Swap with a live recorded sitting from the local Windows bridge before submission.",
+  "fps": 2,
+  "frames": [
+    { "t": 0.0, "gaze": "center", "breathSteadiness": 52, "breathRate": 15.2, "echo": "neutral", "blinkCut": false },
+    { "t": 2.5, "gaze": "left", "breathSteadiness": 68, "breathRate": 14.4, "echo": "neutral", "blinkCut": false },
+    { "t": 6.0, "gaze": "center", "breathSteadiness": 78, "breathRate": 13.8, "echo": "warm", "blinkCut": true },
+    { "t": 11.0, "gaze": "right", "breathSteadiness": 72, "breathRate": 13.5, "echo": "warm", "blinkCut": false },
+    { "t": 15.5, "gaze": "center", "breathSteadiness": 84, "breathRate": 13.0, "echo": "warm", "blinkCut": true },
+    { "t": 21.0, "gaze": "left", "breathSteadiness": 74, "breathRate": 13.2, "echo": "neutral", "blinkCut": false },
+    { "t": 25.0, "gaze": "center", "breathSteadiness": 88, "breathRate": 12.6, "echo": "warm", "blinkCut": true },
+    { "t": 31.0, "gaze": "left", "breathSteadiness": 65, "breathRate": 13.4, "echo": "neutral", "blinkCut": false },
+    { "t": 36.0, "gaze": "center", "breathSteadiness": 82, "breathRate": 12.8, "echo": "neutral", "blinkCut": true },
+    { "t": 42.0, "gaze": "right", "breathSteadiness": 79, "breathRate": 12.9, "echo": "warm", "blinkCut": false },
+    { "t": 47.0, "gaze": "center", "breathSteadiness": 90, "breathRate": 12.4, "echo": "warm", "blinkCut": true },
+    { "t": 53.0, "gaze": "left", "breathSteadiness": 76, "breathRate": 12.7, "echo": "neutral", "blinkCut": true },
+    { "t": 60.0, "gaze": "right", "breathSteadiness": 58, "breathRate": 14.0, "echo": "heavy", "blinkCut": false },
+    { "t": 66.0, "gaze": "center", "breathSteadiness": 71, "breathRate": 13.2, "echo": "neutral", "blinkCut": true },
+    { "t": 72.0, "gaze": "right", "breathSteadiness": 77, "breathRate": 12.8, "echo": "neutral", "blinkCut": true },
+    { "t": 78.0, "gaze": "center", "breathSteadiness": 86, "breathRate": 12.3, "echo": "warm", "blinkCut": true },
+    { "t": 86.0, "gaze": "left", "breathSteadiness": 64, "breathRate": 13.6, "echo": "heavy", "blinkCut": false },
+    { "t": 93.0, "gaze": "center", "breathSteadiness": 73, "breathRate": 13.1, "echo": "heavy", "blinkCut": true },
+    { "t": 100.0, "gaze": "left", "breathSteadiness": 69, "breathRate": 13.3, "echo": "neutral", "blinkCut": true },
+    { "t": 108.0, "gaze": "center", "breathSteadiness": 85, "breathRate": 12.5, "echo": "warm", "blinkCut": true },
+    { "t": 116.0, "gaze": "center", "breathSteadiness": 92, "breathRate": 12.0, "echo": "warm", "blinkCut": false },
+    { "t": 124.0, "gaze": "left", "breathSteadiness": 88, "breathRate": 12.1, "echo": "warm", "blinkCut": true },
+    { "t": 132.0, "gaze": "right", "breathSteadiness": 84, "breathRate": 12.2, "echo": "neutral", "blinkCut": true },
+    { "t": 142.0, "gaze": "center", "breathSteadiness": 94, "breathRate": 11.8, "echo": "warm", "blinkCut": true }
+  ]
+}
