@@ -28,6 +28,8 @@ interface SessionContextValue {
   signals: ReturnType<typeof useSignals>;
   consented: boolean;
   setConsented: (v: boolean) => void;
+  enableCardio: boolean;
+  setEnableCardio: (v: boolean) => void;
   selectedCameraId: string;
   setSelectedCameraId: (id: string) => void;
   soundMuted: boolean;
@@ -44,9 +46,11 @@ interface SessionContextValue {
       gazeCounts: { left: number; center: number; right: number };
       dominantEcho: TonalEcho;
       unlockedHiddenCount: number;
+      avgPulseBpm?: number | null;
     }
   ) => void;
   markCompleted: () => void;
+  resetSittingMetrics: () => void;
   eraseSession: () => void;
 }
 
@@ -65,6 +69,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [consented, setConsented] = useState(true);
+  // Strictly opt-in (OFF by default): avoids Presage §7.4 automatic Anthropic LLM Insights unless explicitly chosen
+  const [enableCardio, setEnableCardio] = useState(false);
   const [selectedCameraId, setSelectedCameraId] = useState('');
   const [soundMuted, setSoundMuted] = useState(false);
 
@@ -72,6 +78,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     startedAt: new Date().toISOString(),
     completed: false,
     source: signals.source,
+    enableCardio: false,
     records: createInitialRecords(),
   }));
 
@@ -95,6 +102,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         gazeCounts: { left: number; center: number; right: number };
         dominantEcho: TonalEcho;
         unlockedHiddenCount: number;
+        avgPulseBpm?: number | null;
       }
     ) => {
       setReport((prev) => {
@@ -109,18 +117,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                 gazeCounts: delta.gazeCounts,
                 dominantEcho: delta.dominantEcho,
                 unlockedHiddenCount: delta.unlockedHiddenCount,
+                avgPulseBpm: delta.avgPulseBpm ?? rec.avgPulseBpm ?? null,
               }
             : rec
         );
-        return { ...prev, source: signals.source, records: nextRecords };
+        return { ...prev, source: signals.source, enableCardio, records: nextRecords };
       });
     },
-    [signals.source]
+    [signals.source, enableCardio]
   );
 
   const markCompleted = useCallback(() => {
-    setReport((prev) => ({ ...prev, completed: true, source: signals.source }));
-  }, [signals.source]);
+    setReport((prev) => ({ ...prev, completed: true, source: signals.source, enableCardio }));
+  }, [signals.source, enableCardio]);
+
+  // Resets session metrics while preserving a warm camera stream when transitioning /calibrate -> /experience
+  const resetSittingMetrics = useCallback(() => {
+    setReport({
+      startedAt: new Date().toISOString(),
+      completed: false,
+      source: signals.source,
+      enableCardio,
+      records: createInitialRecords(),
+    });
+  }, [signals.source, enableCardio]);
 
   const eraseSession = useCallback(() => {
     signals.stopLiveBridge();
@@ -128,9 +148,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       startedAt: new Date().toISOString(),
       completed: false,
       source: signals.source,
+      enableCardio,
       records: createInitialRecords(),
     });
-  }, [signals]);
+  }, [signals, enableCardio]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -141,6 +162,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       signals,
       consented,
       setConsented,
+      enableCardio,
+      setEnableCardio,
       selectedCameraId,
       setSelectedCameraId,
       soundMuted,
@@ -149,6 +172,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       registerBlinkHandler,
       commitSceneStats,
       markCompleted,
+      resetSittingMetrics,
       eraseSession,
     }),
     [
@@ -158,6 +182,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       themes,
       signals,
       consented,
+      enableCardio,
       selectedCameraId,
       soundMuted,
       toggleSound,
@@ -165,6 +190,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       registerBlinkHandler,
       commitSceneStats,
       markCompleted,
+      resetSittingMetrics,
       eraseSession,
     ]
   );

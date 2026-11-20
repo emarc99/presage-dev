@@ -15,16 +15,29 @@ export function CalibratePage() {
     signals,
     consented,
     setConsented,
+    enableCardio,
+    setEnableCardio,
     selectedCameraId,
     setSelectedCameraId,
-    eraseSession,
+    resetSittingMetrics,
   } = useSession();
+
+  const handleToggleCardio = () => {
+    const next = !enableCardio;
+    setEnableCardio(next);
+    if (
+      signals.source === 'bridge' &&
+      (signals.bridgeStatus.state === 'running' || signals.bridgeStatus.state === 'starting')
+    ) {
+      signals.startLiveBridge(selectedCameraId || undefined, next);
+    }
+  };
 
   const handleStartSitting = () => {
     if (signals.source === 'bridge' && !consented) return;
-    eraseSession();
+    resetSittingMetrics();
     if (signals.source === 'bridge') {
-      signals.startLiveBridge(selectedCameraId || undefined);
+      signals.startLiveBridge(selectedCameraId || undefined, enableCardio);
     }
     navigate('/experience');
   };
@@ -139,7 +152,7 @@ export function CalibratePage() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => signals.startLiveBridge(selectedCameraId || undefined)}
+                      onClick={() => signals.startLiveBridge(selectedCameraId || undefined, enableCardio)}
                       disabled={!consented || signals.bridgeStatus.state === 'running'}
                       className="px-3 py-1.5 rounded-lg font-semibold cursor-pointer disabled:opacity-45"
                       style={{ background: 'var(--pop)', color: 'var(--pop-contrast)' }}
@@ -168,6 +181,56 @@ export function CalibratePage() {
               )}
             </div>
           )}
+
+          {/* Optional Opt-In Optical Pulse Toggle with Explicit Presage §7.4 Disclosure */}
+          <div
+            className="rounded-xl p-4 space-y-2.5 text-xs"
+            style={{
+              background: enableCardio ? 'var(--pop-soft)' : 'var(--surface)',
+              border: `1px solid ${enableCardio ? 'var(--pop)' : 'var(--line)'}`,
+            }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold text-sm" style={{ color: 'var(--ink)' }}>
+                  Optional Optical Pulse (<code className="font-mono-tab">cardioMetrics</code>)
+                </div>
+                <div className="font-mono-tab text-[11px]" style={{ color: 'var(--ink-muted)' }}>
+                  Default: OFF · Opt-in required · Read §7.4 &amp; equity notice
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enableCardio}
+                aria-label="Enable optional optical pulse measurement with §7.4 cloud processing"
+                onClick={handleToggleCardio}
+                className="relative shrink-0 w-11 h-6 rounded-full transition-colors cursor-pointer"
+                style={{
+                  background: enableCardio ? 'var(--pop)' : 'var(--surface-alt)',
+                  border: '1px solid var(--line)',
+                }}
+              >
+                <span
+                  className="block w-4 h-4 rounded-full transition-transform"
+                  style={{
+                    background: enableCardio ? 'var(--pop-contrast)' : 'var(--ink-muted)',
+                    transform: enableCardio ? 'translateX(22px)' : 'translateX(3px)',
+                  }}
+                />
+              </button>
+            </div>
+            <p className="m-0 leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+              <strong>Presage §7.4 Disclosure:</strong> Leaving this OFF requests only{' '}
+              <code className="font-mono-tab">faceMetrics + breathingMetrics</code> and avoids automatic
+              Presage → Anthropic LLM Insights. Turning it ON adds{' '}
+              <code className="font-mono-tab">cardioMetrics</code>, which transmits physiological pulse
+              telemetry eligible for Presage SDK Privacy Policy §7.4 Anthropic LLM Insights processing
+              on Presage&apos;s cloud. Camera rPPG also degrades in dim light and darker skin tones
+              (Fitzpatrick V–VI), so readings under 40% confidence stay hidden (<code className="font-mono-tab">null</code>)
+              and never drive pacing.
+            </p>
+          </div>
 
           <ul className="space-y-3 p-0 m-0 list-none text-sm">
             <li className="flex items-start gap-3">
@@ -277,7 +340,24 @@ export function CalibratePage() {
             breathSteadiness={signals.signal.breathSteadiness}
           />
 
-          <div className="grid grid-cols-3 gap-3 text-center text-xs">
+          {signals.source === 'bridge' && signals.bridgeStatus.validationHint && (
+            <div
+              className="rounded-lg px-3 py-2 text-xs font-mono-tab flex items-center justify-between gap-2"
+              style={{
+                background:
+                  signals.bridgeStatus.validation === 'kOk' ? 'var(--pop2-soft)' : 'var(--pop-soft)',
+                color: signals.bridgeStatus.validation === 'kOk' ? 'var(--pop2)' : 'var(--pop)',
+                border: '1px solid var(--line)',
+              }}
+            >
+              <span>{signals.bridgeStatus.validationHint}</span>
+              <span className="shrink-0 opacity-80">{signals.bridgeStatus.validation}</span>
+            </div>
+          )}
+
+          <div
+            className={`grid ${enableCardio ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-3 text-center text-xs`}
+          >
             <div
               className="py-2.5 px-2 rounded-lg"
               style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
@@ -303,8 +383,22 @@ export function CalibratePage() {
               <div style={{ color: 'var(--ink-muted)' }}>Chest Wave</div>
               <div className="font-semibold mt-0.5" style={{ color: 'var(--pop2)' }}>
                 {signals.signal.breathSteadiness}%
+                {signals.signal.breathRate !== null ? ` · ${signals.signal.breathRate} bpm` : ''}
               </div>
             </div>
+            {enableCardio && (
+              <div
+                className="py-2.5 px-2 rounded-lg"
+                style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
+              >
+                <div style={{ color: 'var(--ink-muted)' }}>Pulse (§7.4)</div>
+                <div className="font-semibold mt-0.5 truncate" style={{ color: 'var(--pop)' }}>
+                  {signals.signal.pulseRate !== null
+                    ? `${signals.signal.pulseRate} bpm (${signals.signal.pulseConfidence}%)`
+                    : 'warming up'}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

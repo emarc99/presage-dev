@@ -17,10 +17,15 @@ export interface LiveSignalPacket {
   gaze: GazeZone;
   gazeScalar: number;
   breathSteadiness: number;
+  breathPhase: number;
   breathRate: number | null;
   breathConfidence: number;
   breathWave: number[];
+  talking: boolean;
   echo: TonalEcho;
+  pulseRate: number | null;
+  pulseConfidence: number;
+  pulseStable: boolean;
   silhouette: SilhouettePoint[] | null;
 }
 
@@ -35,6 +40,9 @@ export interface BridgeStatus {
   connected: boolean;
   sdkAvailable: boolean;
   apiKeyConfigured: boolean;
+  enableCardio: boolean;
+  recording: boolean;
+  recordedCount: number;
   state: string;
   cameras: CameraEntry[];
   validation: string;
@@ -58,11 +66,13 @@ export interface SceneRecord {
   };
   dominantEcho: TonalEcho;
   unlockedHiddenCount: number;
+  avgPulseBpm?: number | null;
 }
 
 export interface SessionReport {
   startedAt: string;
   completed: boolean;
   source: SignalSource;
+  enableCardio?: boolean;
   records: SceneRecord[];
 }

@@ -19,10 +19,15 @@ const DEFAULT_SIGNAL: LiveSignalPacket = {
   gaze: 'center',
   gazeScalar: 0.5,
   breathSteadiness: 72,
+  breathPhase: 0,
   breathRate: null,
   breathConfidence: 0,
   breathWave: [],
+  talking: false,
   echo: 'neutral',
+  pulseRate: null,
+  pulseConfidence: 0,
+  pulseStable: false,
   silhouette: null,
 };
 
@@ -30,6 +35,9 @@ const DEFAULT_STATUS: BridgeStatus = {
   connected: false,
   sdkAvailable: false,
   apiKeyConfigured: false,
+  enableCardio: false,
+  recording: false,
+  recordedCount: 0,
   state: 'idle',
   cameras: [],
   validation: 'unknown',
@@ -42,8 +50,11 @@ interface SampleTraceFrame {
   t: number;
   gaze: GazeZone;
   breathSteadiness: number;
+  breathPhase?: number;
   breathRate: number | null;
   echo: TonalEcho;
+  talking?: boolean;
+  pulseRate?: number | null;
   blinkCut: boolean;
 }
 
@@ -55,6 +66,8 @@ export function useSignals(onBlinkCut?: () => void) {
   const [paused, setPaused] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const didAutoSelectRef = useRef(false);
+  const pendingStartRef = useRef<{ cameraId?: string; enableCardio: boolean } | null>(null);
   const onBlinkRef = useRef(onBlinkCut);
   onBlinkRef.current = onBlinkCut;
 
@@ -67,12 +80,21 @@ export function useSignals(onBlinkCut?: () => void) {
       clearTimeout(timer);
       if (res.ok) {
         const data = await res.json();
+        const apiKeyConfigured = Boolean(data.apiKeyConfigured);
+        const sdkAvailable = Boolean(data.sdkAvailable);
         setBridgeAvailable(true);
         setBridgeStatus((prev) => ({
           ...prev,
-          sdkAvailable: Boolean(data.sdkAvailable),
-          apiKeyConfigured: Boolean(data.apiKeyConfigured),
+          sdkAvailable,
+          apiKeyConfigured,
+          enableCardio: Boolean(data.enableCardio),
+          recording: Boolean(data.recording),
+          state: typeof data.state === 'string' ? data.state : prev.state,
         }));
+        if (!didAutoSelectRef.current && data.ok && sdkAvailable && apiKeyConfigured) {
+          didAutoSelectRef.current = true;
+          setSource((prev) => (prev === 'keyboard' ? 'bridge' : prev));
+        }
         return true;
       }
     } catch {
@@ -89,6 +111,7 @@ export function useSignals(onBlinkCut?: () => void) {
   // Connect WebSocket when user selects 'bridge' mode
   useEffect(() => {
     if (source !== 'bridge') {
+      pendingStartRef.current = null;
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -104,6 +127,17 @@ export function useSignals(onBlinkCut?: () => void) {
       if (closed) return;
       setBridgeAvailable(true);
       setBridgeStatus((prev) => ({ ...prev, connected: true, error: null }));
+      if (pendingStartRef.current) {
+        const queued = pendingStartRef.current;
+        pendingStartRef.current = null;
+        ws.send(
+          JSON.stringify({
+            type: 'start',
+            cameraId: queued.cameraId || null,
+            enableCardio: queued.enableCardio,
+          })
+        );
+      }
     };
 
     ws.onmessage = (ev) => {
@@ -115,6 +149,9 @@ export function useSignals(onBlinkCut?: () => void) {
             connected: true,
             sdkAvailable: Boolean(msg.sdkAvailable),
             apiKeyConfigured: Boolean(msg.apiKeyConfigured),
+            enableCardio: Boolean(msg.enableCardio),
+            recording: Boolean(msg.recording),
+            recordedCount: Number(msg.recordedCount ?? 0),
             state: msg.state || 'idle',
             cameras: msg.cameras || [],
             validation: msg.validation || 'unknown',
@@ -139,10 +176,15 @@ export function useSignals(onBlinkCut?: () => void) {
             gazeScalar: typeof msg.gazeScalar === 'number' ? msg.gazeScalar : 0.5,
             breathSteadiness:
               typeof msg.breathSteadiness === 'number' ? msg.breathSteadiness : 55,
+            breathPhase: typeof msg.breathPhase === 'number' ? msg.breathPhase : 0,
             breathRate: msg.breathRate ?? null,
             breathConfidence: msg.breathConfidence ?? 0,
             breathWave: Array.isArray(msg.breathWave) ? msg.breathWave : [],
+            talking: Boolean(msg.talking),
             echo: msg.echo || 'neutral',
+            pulseRate: typeof msg.pulseRate === 'number' ? msg.pulseRate : null,
+            pulseConfidence: typeof msg.pulseConfidence === 'number' ? msg.pulseConfidence : 0,
+            pulseStable: Boolean(msg.pulseStable),
             silhouette: Array.isArray(msg.silhouette) ? msg.silhouette : null,
           });
         }
@@ -194,6 +236,8 @@ export function useSignals(onBlinkCut?: () => void) {
                   (0.45 + (f.breathSteadiness / 100) * 0.45)
               )
             );
+            const syntheticPhase =
+              typeof f.breathPhase === 'number' ? f.breathPhase : Number(Math.sin(phase).toFixed(3));
             if (f.blinkCut) onBlinkRef.current?.();
             setSignal((prev) => ({
               ...prev,
@@ -203,10 +247,15 @@ export function useSignals(onBlinkCut?: () => void) {
               blinkCut: f.blinkCut,
               gaze: f.gaze,
               breathSteadiness: f.breathSteadiness,
+              breathPhase: syntheticPhase,
               breathRate: f.breathRate,
               breathConfidence: 84,
               breathWave: wave,
+              talking: Boolean(f.talking),
               echo: f.echo,
+              pulseRate: typeof f.pulseRate === 'number' ? f.pulseRate : null,
+              pulseConfidence: typeof f.pulseRate === 'number' ? 72 : 0,
+              pulseStable: typeof f.pulseRate === 'number',
             }));
             idx = (idx + 1) % trace.frames.length;
           }
@@ -224,17 +273,41 @@ export function useSignals(onBlinkCut?: () => void) {
     };
   }, [source, paused]);
 
-  const startLiveBridge = useCallback((cameraId?: string) => {
+  const startLiveBridge = useCallback((cameraId?: string, enableCardio = false) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'start', cameraId: cameraId || null }));
+      pendingStartRef.current = null;
+      ws.send(
+        JSON.stringify({
+          type: 'start',
+          cameraId: cameraId || null,
+          enableCardio: Boolean(enableCardio),
+        })
+      );
+    } else {
+      pendingStartRef.current = { cameraId, enableCardio: Boolean(enableCardio) };
     }
   }, []);
 
   const stopLiveBridge = useCallback(() => {
+    pendingStartRef.current = null;
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'stop' }));
+    }
+  }, []);
+
+  const startRecording = useCallback((filename?: string) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'record_start', filename }));
+    }
+  }, []);
+
+  const stopRecording = useCallback((saveAsSample = false) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'record_stop', saveAsSample }));
     }
   }, []);
 
@@ -281,6 +354,8 @@ export function useSignals(onBlinkCut?: () => void) {
     setPaused,
     startLiveBridge,
     stopLiveBridge,
+    startRecording,
+    stopRecording,
     manualBlink,
     manualGaze,
     manualBreath,
