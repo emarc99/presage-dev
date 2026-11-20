@@ -12,10 +12,11 @@ Built as a submission for the [Presage SmartSpectra SDK Challenge](https://dev.t
 
 | Signal | SmartSpectra Source | How AFTERIMAGE Uses It |
 | :--- | :--- | :--- |
-| **Natural Blink** | `face.blinking` + scale-invariant Eye Aspect Ratio (`face.landmarks`) | Debounced (`320 ms`) shutter cut advancing Beat 1 → Beat 2 → Beat 3 → next Scene; long held closure (`≥ 1.1 s`) pauses/resumes drift. |
-| **Coarse Eye Gaze** | Iris landmarks (`468`, `473`) + jaw/cheek yaw (`face.landmarks`) | Shifts active triptych focus (`Left` / `Center` / `Right`), subtle parallax depth, and zone captions with hysteresis deadband. |
-| **Chest Breath Steadiness** | Rolling `4.5 s` window of `breathing.upperTrace` + `breathing.rate` | Evaluates waveform regularity (immune to `~1 s` chest-trace arrival lag and without stalling on `rate` warm-up), clearing SVG optical blur and slowing drift to reveal hidden marginalia. |
-| **Subtle Tonal Echo** | `face.expression` probabilities | Gently shifts atmospheric shading and harmonic WebAudio detune (`Neutral`, `Warm`, `Heavy`)—recorded quietly on the final Contact Sheet. |
+| **Natural Blink (Reopen)** | `face.blinking` + scale-invariant Eye Aspect Ratio (`face.landmarks`) | Blink-on-reopen (`< 650 ms`, `360 ms` debounce) triggers a shutter cut once the beat's **`4.2 s` Shutter Armed** dwell completes (early blinks show an aperture ripple; `Space` cuts immediately). Deliberate long closure (`>= 1.1 s`) toggles pause/resume without prematurely cutting. |
+| **Coarse Eye Gaze** | Iris landmarks (`468`, `473`) + jaw/cheek yaw (`face.landmarks`) | Shifts active triptych focus (`Left` / `Center` / `Right`) with smooth `420 ms` crossfade, stereo audio pan, parallax depth, and zone captions. |
+| **Chest Breath Steadiness** | Rolling `4.5 s` OLS linear-detrended `breathing.upperTrace` + `breathing.rate` | Removes slow posture/auto-exposure baseline drift, computes smoothness + `breathPhase` (`[-1..1]`) to drive steam/dust/halo motion, filtered pink-noise ambience, optical de-haze, and hidden marginalia chime unlocks. Protected by a `1200 ms` `face.talking` speech-artifact guard. |
+| **Subtle Tonal Echo** | `face.expression` probabilities | Calibrated thresholds (`heavy >= 78%` with `alpha = 0.12` EMA, `warm >= 45%` with `alpha = 0.18` EMA) keep resting neutral expressions steady while shifting lighting warmth and WebAudio detune on sustained changes. |
+| **Optical Pulse (Opt-in)** | `cardio.pulseRate` (`cardioMetrics`, **OFF by default**) | Optional opt-in toggle on `/calibrate` with explicit §7.4 and skin-tone disclosure. Values below `40%` confidence are suppressed (`null`). |
 
 ---
 
@@ -29,11 +30,12 @@ Use the top-right switcher in the navigation bar at any time across all four pag
 
 ---
 
-## Consent & Data Handling
+## Consent, Privacy & Presage §7.4 Disclosure
 
-- **Camera stays off until explicit consent:** Video capture never opens until you check consent and start capture on `/calibrate`.
-- **No raw frames stored or sent to the browser:** The native Node host captures at `960×540 @ 30fps` locally (`127.0.0.1:4199`) and forwards only normalized geometric contour points and scalar breath/gaze/blink values over WebSocket. Microphone audio is never requested or opened.
-- **No `cardioMetrics` by default:** Requesting only `faceMetrics + breathingMetrics` ensures consistent tracking across Fitzpatrick skin types I–VI and avoids triggering Presage's automatic Anthropic LLM Insights pipeline (§7.4 of the Nov 3, 2026 SmartSpectra SDK Privacy Policy).
+- **Camera stays off until explicit consent:** Video capture never opens until you check consent and start capture on `/calibrate` (or automatically reconnects safely across `/calibrate` -> `/experience` via serialized bridge stream reuse).
+- **No raw frames stored or sent to the browser:** The native Node host captures at `960×540 @ 30fps` locally (`127.0.0.1:4199`) and forwards only normalized geometric contour points and scalar breath/gaze/blink values over WebSocket (`enableTelemetry: false`). Microphone audio is never requested or opened.
+- **No `cardioMetrics` by default (Presage Privacy Policy §7.4):** Requesting only `faceMetrics + breathingMetrics` ensures reliable tracking without camera rPPG skin-tone bias and **avoids triggering Presage's automatic Presage → Anthropic LLM Insights pipeline (§7.4 of the Nov 3, 2026 SmartSpectra SDK Privacy Policy)**.
+- **Optional opt-in `cardioMetrics` toggle (`/calibrate`):** You can explicitly switch ON optical pulse (`cardioMetrics`) during calibration after reviewing the inline disclosure: enabling `cardioMetrics` transmits physiological pulse telemetry subject to Presage §7.4 Anthropic LLM Insights processing, and camera rPPG reliability drops in dim light or across darker skin tones (Fitzpatrick V–VI), so readings below `40%` confidence are hidden (`null`) and pulse never drives scene pacing.
 - **One-click erasure:** Erase in-memory session metrics anytime from `/contact-sheet`.
 
 ---
@@ -61,17 +63,18 @@ npm start
 # Open http://127.0.0.1:4199
 ```
 
-Useful diagnostics:
+Useful diagnostics & trace recording:
 
 ```bash
-npm run cameras                        # Enumerate native cameras (no key required)
-npm run spike -- --skip-readiness      # Print live 1 Hz SmartSpectra metrics in terminal
-npm test                               # Run deterministic SignalProcessor unit tests
+npm run cameras                                            # Enumerate native cameras (no key required)
+npm run spike -- --skip-readiness --seconds 20             # Print live 1 Hz SmartSpectra metrics in terminal
+node bridge/server.mjs --record recordings/sitting.jsonl   # Record sanitized signal frames to JSONL (plus WS record_start / record_stop with saveAsSample -> web/public/sample-trace.json)
+npm test                                                   # Run deterministic SignalProcessor unit tests
 ```
 
 ### 2. Vercel Hosting (Interactive Preview + Sample Replay)
 
-Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, it cannot run inside browsers or Vercel serverless functions. [vercel.json](./vercel.json) builds and deploys the lightweight React + Vite app (`web/`) directly to Vercel so reviewers can explore the full multi-page experience via **Recorded Sample Trace** replay or **Keyboard Interactive Mode** (`Space` = Blink, `←/↑/→` = Gaze, `Shift` / slider = Breath):
+Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, it cannot run inside browsers or Vercel serverless functions. [vercel.json](./vercel.json) builds and deploys the lightweight React + Vite app (`web/`) directly to Vercel so reviewers can explore the full multi-page experience via **Recorded Sample Trace** replay or **Keyboard Interactive Mode** (`Space` = Instant Blink Cut, `←/↑/→` = Gaze, `Shift` / slider = Breath):
 
 ```bash
 vercel --prod
@@ -81,9 +84,9 @@ vercel --prod
 
 ## Architecture
 
-- [`bridge/signal-processor.mjs`](./bridge/signal-processor.mjs) — Scale-invariant EAR blink debouncer, coarse L/C/R iris gaze estimator, rolling `4.5 s` chest-breath steadiness scorer, tonal echo smoother, and normalized silhouette extractor.
-- [`bridge/server.mjs`](./bridge/server.mjs) — Localhost-only HTTP + WebSocket bridge streaming processed metrics from `@smartspectra/node-sdk` (`faceMetrics + breathingMetrics`, `enableTelemetry: false`) and serving `web/dist`.
-- [`web/`](./web) — React 19 + Vite + TypeScript + Tailwind v4 SPA featuring bespoke multi-layer inline `<svg>` scenes, procedural WebAudio soundscape, and offscreen-canvas PNG Contact Sheet export.
+- [`bridge/signal-processor.mjs`](./bridge/signal-processor.mjs) — Scale-invariant EAR blink-on-reopen debouncer, `1.1 s` long-blink pause detector, `1200 ms` `face.talking` guard, coarse L/C/R iris gaze estimator, OLS linear-detrended `4.5 s` chest-breath steadiness + `breathPhase` scorer, calibrated tonal echo smoother, confidence-gated (`>= 40%`) opt-in `cardio.pulseRate`, and normalized silhouette extractor.
+- [`bridge/server.mjs`](./bridge/server.mjs) — Serialized-mutex localhost HTTP + WebSocket bridge streaming processed metrics from `@smartspectra/node-sdk` (`faceMetrics + breathingMetrics` by default, opt-in `cardioMetrics`, `enableTelemetry: false`), optional JSONL recorder / sample-trace writer, and static server for `web/dist`.
+- [`web/`](./web) — React 19 + Vite + TypeScript + Tailwind v4 SPA featuring bespoke breath-reactive inline `<svg>` scenes, pink-noise + chime WebAudio soundscape, `4.2 s` Shutter Armed dwell UX, and 5-plate Canvas PNG Contact Sheet export (`1600×920`).
 
 ---
 
