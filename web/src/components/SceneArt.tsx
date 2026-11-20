@@ -4,8 +4,10 @@ interface SceneArtProps {
   sceneIndex: number;
   gaze: GazeZone;
   breathSteadiness: number;
+  breathPhase?: number;
   echo: TonalEcho;
   parallaxOffset: number;
+  apertureRippleKey?: number;
 }
 
 const PANES: Record<GazeZone, { x: number; w: number }> = {
@@ -18,12 +20,17 @@ export function SceneArt({
   sceneIndex,
   gaze,
   breathSteadiness,
+  breathPhase = 0,
   echo,
   parallaxOffset,
+  apertureRippleKey = 0,
 }: SceneArtProps) {
   const blurPx = Math.max(0, ((100 - breathSteadiness) / 100) * 6.2).toFixed(2);
   const gazeShift = gaze === 'left' ? 24 : gaze === 'right' ? -24 : 0;
   const activePane = PANES[gaze];
+  const clarity = Math.min(1, Math.max(0, (breathSteadiness - 35) / 55));
+  const phaseShift = Number((breathPhase * 11).toFixed(2));
+  const glowScale = 1 + breathPhase * 0.14;
 
   const echoTint =
     echo === 'warm'
@@ -86,8 +93,14 @@ export function SceneArt({
               <polygon
                 points="90,340 340,340 430,435 165,435"
                 fill="var(--pop-soft)"
-                opacity="0.65"
+                opacity={(0.52 + glowScale * 0.16).toFixed(2)}
               />
+              {/* Floating morning dust motes drifting on breathPhase */}
+              <g fill="var(--pop2)" opacity={(0.35 + clarity * 0.5).toFixed(2)}>
+                <circle cx={195 + phaseShift * 0.5} cy={290 - phaseShift * 0.8} r="2.2" />
+                <circle cx={255 - phaseShift * 0.4} cy={318 + phaseShift * 0.6} r="1.8" />
+                <circle cx={312 + phaseShift * 0.6} cy={365 - phaseShift * 0.9} r="2.4" />
+              </g>
             </g>
 
             {/* Center: Ceramic Coffee Cup & Rising Steam */}
@@ -108,21 +121,23 @@ export function SceneArt({
                 strokeWidth="3"
               />
               <path
-                d={`M568,252 C${548 + Math.sin(parallaxOffset * 0.05) * 14},210 594,175 568,125`}
+                d={`M568,252 C${(548 + Math.sin(parallaxOffset * 0.05) * 14 + phaseShift * 0.7).toFixed(1)},210 ${(594 - phaseShift * 0.5).toFixed(1)},175 568,${(125 - phaseShift * 0.6).toFixed(1)}`}
                 fill="none"
                 stroke="var(--pop)"
                 strokeWidth="3"
                 strokeLinecap="round"
+                opacity={(0.65 + clarity * 0.35).toFixed(2)}
               />
               <path
-                d={`M604,250 C${626 - Math.sin(parallaxOffset * 0.05) * 14},200 582,155 612,102`}
+                d={`M604,250 C${(626 - Math.sin(parallaxOffset * 0.05) * 14 - phaseShift * 0.6).toFixed(1)},200 ${(582 + phaseShift * 0.4).toFixed(1)},155 612,${(102 - phaseShift * 0.8).toFixed(1)}`}
                 fill="none"
                 stroke="var(--pop2)"
                 strokeWidth="3"
                 strokeLinecap="round"
+                opacity={(0.6 + clarity * 0.35).toFixed(2)}
               />
               <path
-                d="M634,255 C650,220 622,190 638,150"
+                d={`M634,255 C${(650 + phaseShift * 0.4).toFixed(1)},220 622,190 638,${(150 - phaseShift * 0.5).toFixed(1)}`}
                 fill="none"
                 stroke="var(--ink-muted)"
                 strokeWidth="2"
@@ -139,9 +154,12 @@ export function SceneArt({
                 stroke="var(--ink)"
                 strokeWidth="2.2"
               />
-              <line x1="910" y1="352" x2="1038" y2="342" stroke="var(--pop)" strokeWidth="2.2" />
-              <line x1="916" y1="376" x2="1012" y2="368" stroke="var(--ink-muted)" strokeWidth="2" opacity="0.6" />
-              <line x1="922" y1="398" x2="986" y2="393" stroke="var(--pop2)" strokeWidth="2" opacity="0.8" />
+              {/* Marginalia ink lines sharpen smoothly as breath clears haze */}
+              <g opacity={(0.28 + clarity * 0.72).toFixed(2)}>
+                <line x1="910" y1="352" x2="1038" y2="342" stroke="var(--pop)" strokeWidth="2.2" />
+                <line x1="916" y1="376" x2="1012" y2="368" stroke="var(--ink-muted)" strokeWidth="2" opacity="0.65" />
+                <line x1="922" y1="398" x2="986" y2="393" stroke="var(--pop2)" strokeWidth="2" opacity="0.85" />
+              </g>
               <ellipse cx="835" cy="356" rx="18" ry="10" fill="var(--line)" stroke="var(--ink)" strokeWidth="1.8" />
               <line x1="850" y1="360" x2="905" y2="395" stroke="var(--ink)" strokeWidth="3.2" strokeLinecap="round" />
             </g>
@@ -151,8 +169,8 @@ export function SceneArt({
         {/* SCENE 1: THE LAST TRAIN NORTH */}
         {sceneIndex === 1 && (
           <g>
-            <circle cx="920" cy="115" r="42" fill="var(--scene-glow)" opacity="0.22" />
-            <circle cx="920" cy="115" r="24" fill="var(--scene-glow)" opacity="0.65" />
+            <circle cx="920" cy="115" r={(42 + breathPhase * 9).toFixed(1)} fill="var(--scene-glow)" opacity={(0.18 + glowScale * 0.08).toFixed(2)} />
+            <circle cx="920" cy="115" r={(24 + breathPhase * 2).toFixed(1)} fill="var(--scene-glow)" opacity="0.65" />
 
             <g
               transform={`translate(${(gazeShift - parallaxOffset).toFixed(1)}, 0)`}
@@ -204,16 +222,18 @@ export function SceneArt({
             {/* Center: Architect Lamp & Open Ruled Notebook */}
             <g transform={`translate(${gazeShift * 0.2}, 0)`}>
               <rect x="0" y="378" width="1200" height="162" fill="var(--scene-struct)" opacity="0.22" />
-              <polygon points="560,150 400,398 730,398" fill={`url(#cone-${sceneIndex})`} />
+              <polygon points="560,150 400,398 730,398" fill={`url(#cone-${sceneIndex})`} opacity={(0.74 + breathPhase * 0.16).toFixed(2)} />
               <path d="M740,392 L675,180 L560,150" fill="none" stroke="var(--ink)" strokeWidth="6" strokeLinejoin="round" />
               <rect x="708" y="384" width="64" height="12" rx="4" fill="var(--ink)" />
               <path d="M538,142 L584,142 L570,168 L552,168 Z" fill="var(--pop)" />
-              {/* Open notebook */}
+              {/* Open notebook + progressive ink marginalia reveal */}
               <rect x="466" y="330" width="210" height="58" rx="4" fill="var(--surface)" stroke="var(--ink)" strokeWidth="2.2" />
               <line x1="571" y1="330" x2="571" y2="388" stroke="var(--line)" strokeWidth="2" />
-              <line x1="486" y1="348" x2="552" y2="348" stroke="var(--pop)" strokeWidth="2" />
-              <line x1="486" y1="364" x2="546" y2="364" stroke="var(--ink-muted)" strokeWidth="1.5" />
-              <line x1="588" y1="348" x2="652" y2="348" stroke="var(--ink-muted)" strokeWidth="1.5" />
+              <g opacity={(0.26 + clarity * 0.74).toFixed(2)}>
+                <line x1="486" y1="348" x2="552" y2="348" stroke="var(--pop)" strokeWidth="2" />
+                <line x1="486" y1="364" x2="546" y2="364" stroke="var(--ink-muted)" strokeWidth="1.5" />
+                <line x1="588" y1="348" x2="652" y2="348" stroke="var(--ink-muted)" strokeWidth="1.5" />
+              </g>
               {/* Pen */}
               <line x1="692" y1="368" x2="736" y2="344" stroke="var(--pop2)" strokeWidth="3.5" strokeLinecap="round" />
             </g>
@@ -223,8 +243,8 @@ export function SceneArt({
               <rect x="850" y="64" width="270" height="270" rx="10" fill="var(--scene-struct)" stroke="var(--line)" strokeWidth="3" />
               <line x1="985" y1="64" x2="985" y2="334" stroke="var(--line)" strokeWidth="2.5" />
               <line x1="850" y1="198" x2="1120" y2="198" stroke="var(--line)" strokeWidth="2.5" />
-              <circle cx="912" cy="142" r="5" fill="var(--pop2)" />
-              <circle cx="1055" cy="112" r="4" fill="var(--pop)" />
+              <circle cx="912" cy="142" r={(5 + breathPhase * 1.4).toFixed(1)} fill="var(--pop2)" />
+              <circle cx="1055" cy="112" r={(4 + breathPhase * 1.1).toFixed(1)} fill="var(--pop)" />
               <path d="M852,334 L852,258 L920,258 L920,295 L1015,295 L1015,240 L1118,240 L1118,334 Z" fill="var(--scene-mid)" opacity="0.6" />
             </g>
           </g>
@@ -251,11 +271,11 @@ export function SceneArt({
 
             {/* Center Hanging Pendant Sphere & Warm Floor Glow */}
             <g transform={`translate(${gazeShift * 0.15}, 0)`}>
-              <polygon points="600,148 410,418 790,418" fill={`url(#cone-${sceneIndex})`} />
+              <polygon points="600,148 410,418 790,418" fill={`url(#cone-${sceneIndex})`} opacity={(0.76 + breathPhase * 0.16).toFixed(2)} />
               <line x1="600" y1="0" x2="600" y2="116" stroke="var(--ink)" strokeWidth="2.5" />
               <circle cx="600" cy="144" r="32" fill="var(--surface)" stroke="var(--pop)" strokeWidth="3" />
-              <circle cx="600" cy="144" r="14" fill="var(--pop2)" opacity="0.7" />
-              <ellipse cx="600" cy="404" rx="145" ry="18" fill="var(--pop-soft)" />
+              <circle cx="600" cy="144" r={(14 + breathPhase * 3).toFixed(1)} fill="var(--pop2)" opacity={(0.58 + glowScale * 0.22).toFixed(2)} />
+              <ellipse cx="600" cy="404" rx={(145 + breathPhase * 14).toFixed(1)} ry="18" fill="var(--pop-soft)" />
             </g>
 
             {/* Right Chair + Side Table & Water Glass */}
@@ -293,19 +313,28 @@ export function SceneArt({
 
             {/* Center: Tall Threshold Doorway & Floor Sunbeam Trapezoid */}
             <g transform={`translate(${gazeShift * 0.2}, 0)`}>
-              <polygon points="495,56 705,56 890,540 310,540" fill="var(--pop-soft)" />
+              <polygon
+                points={`${(495 - breathPhase * 4).toFixed(1)},56 ${(705 + breathPhase * 4).toFixed(1)},56 ${(890 + phaseShift).toFixed(1)},540 ${(310 - phaseShift).toFixed(1)},540`}
+                fill="var(--pop-soft)"
+              />
               <rect x="495" y="56" width="210" height="352" fill={`url(#sky-${sceneIndex})`} stroke="var(--surface)" strokeWidth="4" />
               {/* Half-open wooden door leaf */}
               <polygon points="495,56 602,94 602,436 495,408" fill="var(--pop)" opacity="0.92" />
               <circle cx="585" cy="252" r="5" fill="var(--pop-contrast)" />
+              {/* Daylight threshold dust motes */}
+              <g fill="var(--surface)" opacity={(0.45 + clarity * 0.45).toFixed(2)}>
+                <circle cx={580 + phaseShift * 0.6} cy={310 - phaseShift * 0.9} r="2.2" />
+                <circle cx={645 - phaseShift * 0.5} cy={368 + phaseShift * 0.7} r="2.5" />
+                <circle cx={520 + phaseShift * 0.4} cy={432 - phaseShift * 0.6} r="2.0" />
+              </g>
             </g>
 
             {/* Right: Exterior Porch Glass Lantern */}
             <g transform={`translate(${gazeShift * 0.25}, 0)`}>
-              <rect x="920" y="128" width="110" height="160" rx="55" fill="var(--surface)" opacity="0.16" />
+              <rect x="920" y="128" width="110" height="160" rx="55" fill="var(--surface)" opacity={(0.14 + glowScale * 0.06).toFixed(2)} />
               <path d="M975,86 L975,134" stroke="var(--surface)" strokeWidth="3" />
               <polygon points="948,142 1002,142 992,202 958,202" fill="var(--pop2)" opacity="0.88" stroke="var(--surface)" strokeWidth="2" />
-              <circle cx="975" cy="172" r="14" fill="var(--surface)" opacity="0.85" />
+              <circle cx="975" cy="172" r={(14 + breathPhase * 2.5).toFixed(1)} fill="var(--surface)" opacity="0.85" />
             </g>
           </g>
         )}
@@ -346,7 +375,7 @@ export function SceneArt({
       {/* Tonal Echo Veil */}
       {echo !== 'neutral' && <rect x="0" y="0" width="1200" height="540" fill={echoTint} />}
 
-      {/* Inactive Gaze Pane Dimming Masks + Active Spotlight Frame */}
+      {/* Inactive Gaze Pane Dimming Masks + Active Spotlight Frame (smooth 420ms crossfade) */}
       <rect
         x="48"
         y="38"
@@ -355,6 +384,7 @@ export function SceneArt({
         rx="22"
         fill="var(--bg)"
         opacity={gaze === 'left' ? 0 : 0.36}
+        style={{ transition: 'opacity 420ms ease' }}
       />
       <rect
         x="418"
@@ -364,6 +394,7 @@ export function SceneArt({
         rx="22"
         fill="var(--bg)"
         opacity={gaze === 'center' ? 0 : 0.36}
+        style={{ transition: 'opacity 420ms ease' }}
       />
       <rect
         x="818"
@@ -373,6 +404,7 @@ export function SceneArt({
         rx="22"
         fill="var(--bg)"
         opacity={gaze === 'right' ? 0 : 0.36}
+        style={{ transition: 'opacity 420ms ease' }}
       />
       <rect
         x={activePane.x}
@@ -383,7 +415,25 @@ export function SceneArt({
         fill="none"
         stroke="var(--pop2)"
         strokeWidth="2.5"
+        style={{ transition: 'x 420ms ease, width 420ms ease' }}
       />
+
+      {/* Tactile aperture ripple when user blinks before 4.2s dwell arming */}
+      {apertureRippleKey > 0 && (
+        <circle
+          key={apertureRippleKey}
+          cx={activePane.x + activePane.w / 2}
+          cy="218"
+          r="40"
+          fill="none"
+          stroke="var(--pop)"
+          strokeWidth="2"
+          opacity="0"
+        >
+          <animate attributeName="r" from="38" to="92" dur="0.55s" fill="freeze" />
+          <animate attributeName="opacity" from="0.72" to="0" dur="0.55s" fill="freeze" />
+        </circle>
+      )}
     </svg>
   );
 }

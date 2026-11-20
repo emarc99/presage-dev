@@ -7,11 +7,13 @@ import { useSession } from '../context/SessionContext';
 import type { GazeZone, TonalEcho } from '../types/signals';
 
 const HIDDEN_UNLOCK_THRESHOLD = 60;
+const SHUTTER_ARM_MS = 4200;
 
 export function ExperiencePage() {
   const navigate = useNavigate();
   const {
     signals,
+    enableCardio,
     soundMuted,
     toggleSound,
     registerBlinkHandler,
@@ -24,10 +26,18 @@ export function ExperiencePage() {
   const [shutterCount, setShutterCount] = useState(0);
   const [showSignalsDrawer, setShowSignalsDrawer] = useState(false);
   const [parallaxOffset, setParallaxOffset] = useState(0);
+  const [armedElapsedMs, setArmedElapsedMs] = useState(0);
+  const [apertureRippleKey, setApertureRippleKey] = useState(0);
 
   const scene = SCENES[sceneIdx];
   const beat = scene.beats[beatIdx];
   const { signal, paused, setPaused } = signals;
+
+  const latestSignalRef = useRef(signal);
+  latestSignalRef.current = signal;
+  const armedElapsedRef = useRef(0);
+  armedElapsedRef.current = armedElapsedMs;
+  const manualBypassRef = useRef(false);
 
   const statsRef = useRef({
     sceneIdx: 0,
@@ -35,20 +45,26 @@ export function ExperiencePage() {
     blinkCuts: 0,
     steadinessSum: 0,
     steadinessSamples: 0,
+    pulseSum: 0,
+    pulseSamples: 0,
     latestWave: [] as number[],
     gazeCounts: { left: 0, center: 0, right: 0 },
     echoCounts: { neutral: 0, warm: 0, heavy: 0 } as Record<TonalEcho, number>,
     unlockedBeats: new Set<number>(),
+    flushed: false,
   });
 
   const flushSceneStats = useCallback(
     (targetIdx: number) => {
       const st = statsRef.current;
+      const sig = latestSignalRef.current;
       const holdSeconds = Number(Math.max(0.5, (Date.now() - st.startedAtMs) / 1000).toFixed(1));
       const avgSteadiness =
         st.steadinessSamples > 0
           ? Math.round(st.steadinessSum / st.steadinessSamples)
-          : signal.breathSteadiness;
+          : sig.breathSteadiness;
+      const avgPulseBpm =
+        st.pulseSamples > 0 ? Number((st.pulseSum / st.pulseSamples).toFixed(1)) : null;
 
       let dominantEcho: TonalEcho = 'neutral';
       if (st.echoCounts.warm > st.echoCounts.neutral && st.echoCounts.warm >= st.echoCounts.heavy) {
@@ -60,17 +76,19 @@ export function ExperiencePage() {
         dominantEcho = 'heavy';
       }
 
+      st.flushed = true;
       commitSceneStats(targetIdx, {
         holdSeconds,
         blinkCuts: st.blinkCuts,
         avgSteadiness,
-        breathRibbon: st.latestWave.length > 0 ? st.latestWave : signal.breathWave,
+        breathRibbon: st.latestWave.length > 0 ? st.latestWave : sig.breathWave,
         gazeCounts: { ...st.gazeCounts },
         dominantEcho,
         unlockedHiddenCount: st.unlockedBeats.size,
+        avgPulseBpm,
       });
     },
-    [commitSceneStats, signal.breathSteadiness, signal.breathWave]
+    [commitSceneStats]
   );
 
   const resetSceneAccumulator = useCallback((nextIdx: number) => {
@@ -80,18 +98,36 @@ export function ExperiencePage() {
       blinkCuts: 0,
       steadinessSum: 0,
       steadinessSamples: 0,
+      pulseSum: 0,
+      pulseSamples: 0,
       latestWave: [],
       gazeCounts: { left: 0, center: 0, right: 0 },
       echoCounts: { neutral: 0, warm: 0, heavy: 0 },
       unlockedBeats: new Set<number>(),
+      flushed: false,
     };
   }, []);
 
   const advanceOnBlink = useCallback(() => {
+    const isManual = manualBypassRef.current;
+    manualBypassRef.current = false;
+
+    if (paused && !isManual) {
+      return;
+    }
+
+    if (!isManual && armedElapsedRef.current < SHUTTER_ARM_MS) {
+      soundscape.ensureStarted(SCENES[sceneIdx].baseHz);
+      setApertureRippleKey((k) => k + 1);
+      return;
+    }
+
     soundscape.ensureStarted(SCENES[sceneIdx].baseHz);
     soundscape.playShutterClick();
     setShutterCount((c) => c + 1);
     statsRef.current.blinkCuts += 1;
+    setArmedElapsedMs(0);
+    armedElapsedRef.current = 0;
 
     if (beatIdx < 2) {
       setBeatIdx((b) => b + 1);
@@ -110,7 +146,7 @@ export function ExperiencePage() {
       signals.stopLiveBridge();
       navigate('/contact-sheet');
     }
-  }, [beatIdx, flushSceneStats, markCompleted, navigate, resetSceneAccumulator, sceneIdx, signals]);
+  }, [beatIdx, flushSceneStats, markCompleted, navigate, paused, resetSceneAccumulator, sceneIdx, signals]);
 
   // Bind live blink handler from SmartSpectra / Sample Trace / Manual trigger
   useEffect(() => {
@@ -118,28 +154,44 @@ export function ExperiencePage() {
     return () => registerBlinkHandler(null);
   }, [advanceOnBlink, registerBlinkHandler]);
 
-  // Flush partial scene stats cleanly if user leaves page via navbar
+  // Dwell-arming 4.2s clock per beat (pauses automatically during long-blink pause)
+  useEffect(() => {
+    if (paused) return;
+    const id = window.setInterval(() => {
+      setArmedElapsedMs((prev) => Math.min(SHUTTER_ARM_MS + 100, prev + 120));
+    }, 120);
+    return () => window.clearInterval(id);
+  }, [paused, sceneIdx, beatIdx]);
+
+  // Flush partial scene stats cleanly ONLY once when sceneIdx changes or user leaves page via navbar
   useEffect(() => {
     const currentIdx = sceneIdx;
     return () => {
-      flushSceneStats(currentIdx);
+      if (statsRef.current.sceneIdx === currentIdx && !statsRef.current.flushed) {
+        flushSceneStats(currentIdx);
+      }
     };
   }, [flushSceneStats, sceneIdx]);
 
-  // Accumulate breath/gaze/echo samples on every signal tick
+  // Accumulate breath/gaze/echo/pulse samples on every signal tick
   useEffect(() => {
     const st = statsRef.current;
     st.steadinessSum += signal.breathSteadiness;
     st.steadinessSamples += 1;
+    if (enableCardio && signal.pulseRate !== null) {
+      st.pulseSum += signal.pulseRate;
+      st.pulseSamples += 1;
+    }
     if (signal.breathWave.length > 0) {
       st.latestWave = signal.breathWave;
     }
     st.gazeCounts[signal.gaze] += 1;
     st.echoCounts[signal.echo] += 1;
-    if (signal.breathSteadiness >= HIDDEN_UNLOCK_THRESHOLD) {
+    if (signal.breathSteadiness >= HIDDEN_UNLOCK_THRESHOLD && !st.unlockedBeats.has(beatIdx)) {
       st.unlockedBeats.add(beatIdx);
+      soundscape.playMarginaliaChime();
     }
-  }, [beatIdx, signal]);
+  }, [beatIdx, enableCardio, signal]);
 
   // Update procedural soundscape
   useEffect(() => {
@@ -147,8 +199,8 @@ export function ExperiencePage() {
   }, [scene.baseHz]);
 
   useEffect(() => {
-    soundscape.update(signal.breathSteadiness, signal.echo, signal.gaze);
-  }, [signal.breathSteadiness, signal.echo, signal.gaze]);
+    soundscape.update(signal.breathSteadiness, signal.echo, signal.gaze, signal.breathPhase);
+  }, [signal.breathSteadiness, signal.echo, signal.gaze, signal.breathPhase]);
 
   // Smooth drift loop slowed by calm breathing
   useEffect(() => {
@@ -164,23 +216,30 @@ export function ExperiencePage() {
     return () => window.cancelAnimationFrame(rafId);
   }, [paused, signal.breathSteadiness]);
 
-  // Keyboard shortcuts (Space = Blink Cut, Arrows = Gaze, Shift hold = Steady breath)
+  const { manualBlink, manualGaze, manualBreath } = signals;
+
+  const triggerManualBlink = useCallback(() => {
+    manualBypassRef.current = true;
+    manualBlink();
+  }, [manualBlink]);
+
+  // Keyboard shortcuts (Space = Instant Blink Cut bypass, Arrows = Gaze, Shift hold = Steady breath)
   useEffect(() => {
     let shiftInterval: number | null = null;
 
     const onKeyDown = (ev: KeyboardEvent) => {
       if (ev.code === 'Space') {
         ev.preventDefault();
-        signals.manualBlink();
+        triggerManualBlink();
       } else if (ev.key === 'ArrowLeft') {
-        signals.manualGaze('left');
+        manualGaze('left');
       } else if (ev.key === 'ArrowUp') {
-        signals.manualGaze('center');
+        manualGaze('center');
       } else if (ev.key === 'ArrowRight') {
-        signals.manualGaze('right');
+        manualGaze('right');
       } else if (ev.key === 'Shift' && shiftInterval === null) {
         shiftInterval = window.setInterval(() => {
-          signals.manualBreath(Math.min(96, signal.breathSteadiness + 5));
+          manualBreath(Math.min(96, latestSignalRef.current.breathSteadiness + 5));
         }, 120);
       }
     };
@@ -199,10 +258,20 @@ export function ExperiencePage() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [signal.breathSteadiness, signals]);
+  }, [manualBreath, manualGaze, triggerManualBlink]);
 
   const driftMultiplier = (1.15 - (signal.breathSteadiness / 100) * 0.85).toFixed(2);
   const hiddenUnlocked = signal.breathSteadiness >= HIDDEN_UNLOCK_THRESHOLD;
+  const shutterArmed = armedElapsedMs >= SHUTTER_ARM_MS;
+  const wavePolyline = (
+    signal.breathWave.length > 1 ? signal.breathWave : [0, 0.25, 0.5, 0.25, 0, -0.25, -0.5, -0.25, 0]
+  )
+    .map((v, i, arr) => {
+      const x = (i / Math.max(1, arr.length - 1)) * 78;
+      const y = 12 - Math.max(-1, Math.min(1, v)) * 9;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
 
   const handleFinishEarly = () => {
     flushSceneStats(sceneIdx);
@@ -293,6 +362,16 @@ export function ExperiencePage() {
           <span>
             ECHO: <strong className="uppercase">{signal.echo}</strong>
           </span>
+          {enableCardio && (
+            <span>
+              PULSE (§7.4):{' '}
+              <strong style={{ color: 'var(--pop)' }}>
+                {signal.pulseRate !== null
+                  ? `${signal.pulseRate} BPM (${signal.pulseConfidence}%)`
+                  : 'warming-up'}
+              </strong>
+            </span>
+          )}
         </div>
       )}
 
@@ -323,12 +402,14 @@ export function ExperiencePage() {
           sceneIndex={sceneIdx}
           gaze={signal.gaze}
           breathSteadiness={signal.breathSteadiness}
+          breathPhase={signal.breathPhase}
           echo={signal.echo}
           parallaxOffset={parallaxOffset}
+          apertureRippleKey={apertureRippleKey}
         />
 
-        {/* Focus Gaze Tag inside Top Corner */}
-        <div className="pointer-events-none absolute top-3 left-4 right-4 flex items-center justify-between gap-2 text-xs font-mono-tab">
+        {/* Focus Gaze Tag + Dwell Shutter State inside Top Corner */}
+        <div className="pointer-events-none absolute top-3 left-4 right-4 flex flex-wrap items-center justify-between gap-2 text-xs font-mono-tab">
           <span
             className="px-2.5 py-1 rounded-full"
             style={{
@@ -339,14 +420,55 @@ export function ExperiencePage() {
           >
             FOCUS: {scene.zoneLabels[signal.gaze]}
           </span>
-          {paused && (
-            <span
-              className="px-2.5 py-1 rounded-full font-semibold"
-              style={{ background: 'var(--pop2)', color: 'var(--pop-contrast)' }}
-            >
-              PAUSED (LONG BLINK)
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {signal.talking && (
+              <span
+                className="px-2.5 py-1 rounded-full font-semibold"
+                style={{
+                  background: 'var(--pop2-soft)',
+                  color: 'var(--pop2)',
+                  border: '1px solid var(--line)',
+                }}
+              >
+                TALKING · BREATH HELD
+              </span>
+            )}
+            {enableCardio && signal.pulseRate !== null && (
+              <span
+                className="px-2.5 py-1 rounded-full"
+                style={{
+                  background: 'color-mix(in srgb, var(--bg) 82%, transparent)',
+                  color: 'var(--pop)',
+                  border: '1px solid var(--line)',
+                }}
+              >
+                PULSE {signal.pulseRate} BPM
+              </span>
+            )}
+            {paused ? (
+              <span
+                className="px-2.5 py-1 rounded-full font-semibold"
+                style={{ background: 'var(--pop2)', color: 'var(--pop-contrast)' }}
+              >
+                PAUSED (LONG BLINK)
+              </span>
+            ) : (
+              <span
+                className="px-2.5 py-1 rounded-full font-semibold"
+                style={{
+                  background: shutterArmed
+                    ? 'var(--pop-soft)'
+                    : 'color-mix(in srgb, var(--bg) 82%, transparent)',
+                  color: shutterArmed ? 'var(--pop)' : 'var(--ink-muted)',
+                  border: '1px solid var(--line)',
+                }}
+              >
+                {shutterArmed
+                  ? 'SHUTTER ARMED · BLINK TO CUT'
+                  : `EXPOSING · ${(armedElapsedMs / 1000).toFixed(1)}s / 4.2s`}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Eyelid Shutter Wipe keyed on shutterCount */}
@@ -389,7 +511,7 @@ export function ExperiencePage() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={signals.manualBlink}
+            onClick={triggerManualBlink}
             className="px-5 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-transform active:scale-95"
             style={{ background: 'var(--pop)', color: 'var(--pop-contrast)' }}
           >
@@ -438,16 +560,33 @@ export function ExperiencePage() {
           </button>
         </div>
 
-        <div className="flex flex-1 max-w-sm items-center gap-3">
+        <div className="flex flex-1 max-w-md items-center gap-3">
           <span className="font-mono-tab text-xs shrink-0" style={{ color: 'var(--ink-muted)' }}>
             BREATH
           </span>
+          <svg
+            width="80"
+            height="24"
+            viewBox="0 0 80 24"
+            className="shrink-0 rounded px-0.5"
+            style={{ background: 'var(--bg)', border: '1px solid var(--line)' }}
+            aria-label="Live chest wave ribbon"
+          >
+            <polyline
+              fill="none"
+              stroke="var(--pop2)"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              points={wavePolyline}
+            />
+          </svg>
           <input
             type="range"
             min="10"
             max="100"
             value={signal.breathSteadiness}
-            onChange={(e) => signals.manualBreath(Number(e.target.value))}
+            onChange={(e) => manualBreath(Number(e.target.value))}
             className="w-full cursor-pointer"
             style={{ accentColor: 'var(--pop2)' }}
             aria-label="Breath Steadiness"
