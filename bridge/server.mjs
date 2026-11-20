@@ -8,6 +8,7 @@ import {
   CameraSelection,
   faceMetrics,
   breathingMetrics,
+  cardioMetrics,
   SmartSpectraErrorCode,
   ValidationCode,
   ProcessingStatus,
@@ -57,6 +58,7 @@ function parseArgs(argv) {
     port: Number(process.env.PORT) || 4199,
     noCamera: false,
     file: null,
+    record: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -67,6 +69,8 @@ function parseArgs(argv) {
       opts.noCamera = true;
     } else if (a === '--file' && argv[i + 1]) {
       opts.file = argv[++i];
+    } else if (a === '--record' && argv[i + 1]) {
+      opts.record = argv[++i];
     }
   }
   return opts;
@@ -135,7 +139,80 @@ async function main() {
   let lastErrorCode = null;
   let retryCount = 0;
   let activeSourceConfig = null;
+  let activeEnableCardio = false;
   let disconnectTimer = null;
+
+  // Serialized async mutex prevents start/stop races across route switches & transient errors
+  let opQueue = Promise.resolve();
+  function enqueueOp(fn) {
+    const run = opQueue.then(fn, fn);
+    opQueue = run.catch(() => {});
+    return run;
+  }
+
+  // Optional JSONL signal recorder + 2Hz sample-trace extractor
+  let recordStream = null;
+  let recordPath = null;
+  let recordStartedAt = 0;
+  let recordedCount = 0;
+  let lastSampleEmitMs = -Infinity;
+  let sampleFrames = [];
+
+  function startRecording(targetFile) {
+    if (recordStream) return recordPath;
+    const recDir = path.join(ROOT_DIR, 'recordings');
+    const safeName = targetFile
+      ? path.basename(String(targetFile)).replace(/[^a-zA-Z0-9._-]/g, '_')
+      : `sitting-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
+    const resolved =
+      opts.record && !targetFile
+        ? path.resolve(opts.record)
+        : path.join(recDir, safeName.endsWith('.jsonl') ? safeName : `${safeName}.jsonl`);
+    fs.mkdirSync(path.dirname(resolved), { recursive: true });
+    recordStream = fs.createWriteStream(resolved, { flags: 'a' });
+    recordPath = resolved;
+    recordStartedAt = Date.now();
+    recordedCount = 0;
+    lastSampleEmitMs = -Infinity;
+    sampleFrames = [];
+    console.log(`[bridge] Recording signal frames to ${recordPath}`);
+    return recordPath;
+  }
+
+  async function stopRecording(saveAsSample = false) {
+    if (!recordStream) {
+      return { path: null, count: 0, sampleSaved: false };
+    }
+    const stream = recordStream;
+    const outPath = recordPath;
+    const count = recordedCount;
+    const capturedSamples = sampleFrames.slice();
+    recordStream = null;
+    recordPath = null;
+    recordStartedAt = 0;
+    recordedCount = 0;
+    sampleFrames = [];
+    await new Promise((resolve) => stream.end(resolve));
+
+    let sampleSaved = false;
+    if (saveAsSample && capturedSamples.length >= 4) {
+      const sampleOut = path.join(ROOT_DIR, 'web', 'public', 'sample-trace.json');
+      const payload = {
+        kind: 'recorded_sitting',
+        note: `Recorded live SmartSpectra sitting (${capturedSamples.length} keyframes from Windows webcam bridge).`,
+        fps: 2,
+        frames: capturedSamples,
+      };
+      fs.writeFileSync(sampleOut, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+      sampleSaved = true;
+      console.log(`[bridge] Saved ${capturedSamples.length} keyframes to ${sampleOut}`);
+    }
+    return { path: outPath, count, sampleSaved };
+  }
+
+  if (opts.record) {
+    startRecording();
+  }
 
   // 1s FPS meter
   let packetsInWindow = 0;
@@ -163,6 +240,9 @@ async function main() {
       cameras: listCamerasSafe(),
       apiKeyConfigured: Boolean(getApiKey()),
       sdkAvailable: true,
+      enableCardio: activeEnableCardio,
+      recording: Boolean(recordStream),
+      recordedCount,
       validation: latestValidation,
       validationHint: latestHint,
       error: lastError,
@@ -170,14 +250,18 @@ async function main() {
     };
   }
 
-  async function stopCapture(reason = 'stopped') {
+  async function _stopCaptureInner(reason = 'stopped') {
     if (!sdk) {
       activeState = 'idle';
+      activeSourceConfig = null;
+      activeEnableCardio = false;
       broadcast(buildStatusPayload());
       return;
     }
     const current = sdk;
     sdk = null;
+    activeSourceConfig = null;
+    activeEnableCardio = false;
     activeState = 'stopping';
     broadcast(buildStatusPayload());
     try {
@@ -195,7 +279,11 @@ async function main() {
     broadcast(buildStatusPayload());
   }
 
-  async function startCapture(config = {}) {
+  function stopCapture(reason = 'stopped') {
+    return enqueueOp(() => _stopCaptureInner(reason));
+  }
+
+  async function _startCaptureInner(config = {}) {
     if (opts.noCamera) {
       lastError = 'Bridge running with --no-camera';
       lastErrorCode = 'kInputUnavailable';
@@ -213,29 +301,53 @@ async function main() {
       return;
     }
 
-    await stopCapture('restart');
+    const nextConfig = {
+      cameraId: config.cameraId || null,
+      filePath: config.filePath || opts.file || null,
+      enableCardio: Boolean(config.enableCardio),
+    };
+
+    // Warm stream reuse: avoid tearing down active DirectShow/MediaFoundation handle when
+    // transitioning /calibrate -> /experience with identical camera/file/cardio config.
+    const isWarm = sdk && (activeState === 'starting' || activeState === 'running');
+    const sameConfig =
+      activeSourceConfig &&
+      activeSourceConfig.cameraId === nextConfig.cameraId &&
+      activeSourceConfig.filePath === nextConfig.filePath &&
+      activeSourceConfig.enableCardio === nextConfig.enableCardio;
+    if (isWarm && sameConfig) {
+      broadcast(buildStatusPayload());
+      return;
+    }
+
+    await _stopCaptureInner('restart');
     lastError = null;
     lastErrorCode = null;
-    activeSourceConfig = config;
+    activeSourceConfig = nextConfig;
+    activeEnableCardio = nextConfig.enableCardio;
     activeState = 'starting';
     processor.reset();
     broadcast(buildStatusPayload());
 
+    // cardioMetrics is strictly opt-in (OFF by default). Presage SDK Privacy Policy §7.4
+    // notes automatic Presage -> Anthropic LLM Insights processing on cloud cardio requests.
+    const requestedMetrics = nextConfig.enableCardio
+      ? [...faceMetrics, ...breathingMetrics, ...cardioMetrics]
+      : [...faceMetrics, ...breathingMetrics];
+
     const instance = new SmartSpectraSDK({
       apiKey,
-      // Explicitly omit cardioMetrics (only face + breathing) so Nov 3 §7.4
-      // automatic Anthropic LLM Insights telemetry is not triggered.
-      requestedMetrics: [...faceMetrics, ...breathingMetrics],
+      requestedMetrics,
       enableTelemetry: false,
     });
     sdk = instance;
 
-    const filePath = config.filePath || opts.file;
+    const filePath = nextConfig.filePath;
     if (filePath) {
       instance.useFile(path.resolve(filePath), { interframeDelayMs: 33 });
     } else {
-      const selection = config.cameraId
-        ? CameraSelection.byId(config.cameraId)
+      const selection = nextConfig.cameraId
+        ? CameraSelection.byId(nextConfig.cameraId)
         : CameraSelection.default;
       instance.useCamera(selection, { width: 960, height: 540, fps: 30 });
     }
@@ -269,10 +381,11 @@ async function main() {
         code === SmartSpectraErrorCode.kProcessingFailed;
       if (transient && retryCount < 2 && clients.size > 0 && sdk === instance) {
         retryCount += 1;
+        const recoverCfg = activeSourceConfig ? { ...activeSourceConfig } : {};
         console.log(`[bridge] Transient error recovery attempt ${retryCount}/2...`);
         await stopCapture('auto-recover');
         setTimeout(() => {
-          if (clients.size > 0) startCapture(activeSourceConfig || {});
+          if (clients.size > 0) startCapture(recoverCfg);
         }, 1200);
         return;
       }
@@ -290,15 +403,40 @@ async function main() {
       } catch (err) {
         return;
       }
-      const out = processor.process(decoded, Date.now());
-      broadcast({
+      const nowMs = Date.now();
+      const out = processor.process(decoded, nowMs);
+      const signalMsg = {
         type: 'signal',
         fps: currentFps,
         ...out,
-      });
+      };
+      if (recordStream) {
+        const { silhouette: _omitSilhouette, ...compact } = out;
+        recordStream.write(`${JSON.stringify({ t: Number(((nowMs - recordStartedAt) / 1000).toFixed(2)), fps: currentFps, ...compact })}\n`);
+        recordedCount += 1;
+        if (out.blinkCut || nowMs - lastSampleEmitMs >= 500) {
+          lastSampleEmitMs = nowMs;
+          sampleFrames.push({
+            t: Number(((nowMs - recordStartedAt) / 1000).toFixed(2)),
+            gaze: out.gaze,
+            breathSteadiness: out.breathSteadiness,
+            breathPhase: out.breathPhase,
+            breathRate: out.breathRate,
+            echo: out.echo,
+            talking: out.talking,
+            pulseRate: out.pulseRate,
+            blinkCut: out.blinkCut,
+          });
+        }
+      }
+      broadcast(signalMsg);
     });
 
     instance.start();
+  }
+
+  function startCapture(config = {}) {
+    return enqueueOp(() => _startCaptureInner(config));
   }
 
   const server = http.createServer((req, res) => {
@@ -316,6 +454,8 @@ async function main() {
           sdkAvailable: true,
           apiKeyConfigured: Boolean(getApiKey()),
           state: activeState,
+          enableCardio: activeEnableCardio,
+          recording: Boolean(recordStream),
           camerasCount: listCamerasSafe().length,
         })
       );
@@ -367,9 +507,18 @@ async function main() {
         await startCapture({
           cameraId: msg.cameraId || null,
           filePath: msg.filePath || null,
+          enableCardio: Boolean(msg.enableCardio),
         });
       } else if (msg?.type === 'stop') {
         await stopCapture('client_stop');
+      } else if (msg?.type === 'record_start') {
+        const outPath = startRecording(msg.filename);
+        ws.send(JSON.stringify({ type: 'ack', action: 'record_start', ok: true, path: outPath }));
+        broadcast(buildStatusPayload());
+      } else if (msg?.type === 'record_stop') {
+        const summary = await stopRecording(Boolean(msg.saveAsSample));
+        ws.send(JSON.stringify({ type: 'ack', action: 'record_stop', ok: true, ...summary }));
+        broadcast(buildStatusPayload());
       } else if (msg?.type === 'record_export') {
         ws.send(JSON.stringify({ type: 'ack', action: 'record_export', ok: true }));
       }
@@ -388,6 +537,7 @@ async function main() {
   async function cleanExit() {
     clearInterval(fpsTimer);
     if (disconnectTimer) clearTimeout(disconnectTimer);
+    await stopRecording(false);
     await stopCapture('shutdown');
     wss.close();
     server.close(() => process.exit(0));

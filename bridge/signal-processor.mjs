@@ -118,10 +118,13 @@ export class SignalProcessor {
   constructor(options = {}) {
     this.mirrorX = options.mirrorX ?? true;
     this.earBlinkThreshold = options.earBlinkThreshold ?? 0.19;
-    this.minBlinkGapMs = options.minBlinkGapMs ?? 320;
+    this.minBlinkGapMs = options.minBlinkGapMs ?? 360;
+    this.maxQuickBlinkMs = options.maxQuickBlinkMs ?? 650;
     this.longBlinkMs = options.longBlinkMs ?? 1100;
+    this.talkingHoldMs = options.talkingHoldMs ?? 1200;
     this.breathWindowMs = options.breathWindowMs ?? 4500;
     this.gazeAlpha = options.gazeAlpha ?? 0.25;
+    this.pulseConfidenceMin = options.pulseConfidenceMin ?? 40;
     this.reset();
   }
 
@@ -134,11 +137,17 @@ export class SignalProcessor {
     this.gazeZone = 'center';
     this.breathSamples = [];
     this.lastBreathSteadiness = 55;
+    this.breathPhaseEma = 0;
     this.latestBreathRate = null;
     this.latestBreathConfidence = 0;
+    this.lastTalkingMs = -Infinity;
+    this.talking = false;
     this.exprWarmEma = 0;
     this.exprHeavyEma = 0;
     this.echo = 'neutral';
+    this.latestPulseRate = null;
+    this.latestPulseConfidence = 0;
+    this.latestPulseStable = false;
     this.lastSilhouette = null;
     this.lastEar = null;
   }
@@ -148,8 +157,9 @@ export class SignalProcessor {
     let blinkCut = false;
     let longBlinkPause = false;
     let faceDetected = false;
+    let closedDurationOnFrame = 0;
 
-    // 1. Face landmarks: EAR, Blink fallback, Coarse Gaze, Silhouette
+    // 1. Face landmarks: EAR (blink-on-reopen), Coarse Gaze, Silhouette
     const landmarkFrames = m.face?.landmarks || [];
     if (landmarkFrames.length > 0) {
       const latest = landmarkFrames[landmarkFrames.length - 1];
@@ -163,15 +173,24 @@ export class SignalProcessor {
           if (isLow && !this.wasLowEar) {
             this.eyesClosedSinceMs = nowMs;
             this.longBlinkFired = false;
-            if (nowMs - this.lastBlinkEmitMs >= this.minBlinkGapMs) {
-              blinkCut = true;
-              this.lastBlinkEmitMs = nowMs;
-            }
           } else if (isLow && this.eyesClosedSinceMs !== null) {
-            if (!this.longBlinkFired && nowMs - this.eyesClosedSinceMs >= this.longBlinkMs) {
+            closedDurationOnFrame = nowMs - this.eyesClosedSinceMs;
+            if (!this.longBlinkFired && closedDurationOnFrame >= this.longBlinkMs) {
               longBlinkPause = true;
               this.longBlinkFired = true;
             }
+          } else if (!isLow && this.wasLowEar && this.eyesClosedSinceMs !== null) {
+            closedDurationOnFrame = nowMs - this.eyesClosedSinceMs;
+            if (
+              !this.longBlinkFired &&
+              closedDurationOnFrame < this.maxQuickBlinkMs &&
+              nowMs - this.lastBlinkEmitMs >= this.minBlinkGapMs
+            ) {
+              blinkCut = true;
+              this.lastBlinkEmitMs = nowMs;
+            }
+            this.eyesClosedSinceMs = null;
+            this.longBlinkFired = false;
           } else if (!isLow) {
             this.eyesClosedSinceMs = null;
             this.longBlinkFired = false;
@@ -196,17 +215,34 @@ export class SignalProcessor {
       }
     }
 
-    // 2. SmartSpectra native blinking onset pulses
+    // 2. SmartSpectra native blinking onset pulses (suppressed while holding eyes closed >=400ms or mid-closure)
+    const closedElapsed =
+      this.eyesClosedSinceMs !== null
+        ? Math.max(closedDurationOnFrame, nowMs - this.eyesClosedSinceMs)
+        : closedDurationOnFrame;
     for (const b of m.face?.blinking || []) {
       if (b?.detected) {
-        if (nowMs - this.lastBlinkEmitMs >= this.minBlinkGapMs) {
+        if (
+          !this.wasLowEar &&
+          !this.longBlinkFired &&
+          closedElapsed < 400 &&
+          nowMs - this.lastBlinkEmitMs >= this.minBlinkGapMs
+        ) {
           blinkCut = true;
           this.lastBlinkEmitMs = nowMs;
         }
       }
     }
 
-    // 3. Rolling 4.5s chest breathing steadiness (immune to ~1s phase lag)
+    // 3. Talking speech-artifact guard (1200ms gap-bridge)
+    for (const t of m.face?.talking || []) {
+      if (t?.detected) {
+        this.lastTalkingMs = nowMs;
+      }
+    }
+    this.talking = nowMs - this.lastTalkingMs <= this.talkingHoldMs;
+
+    // 4. Rolling 4.5s linear-detrended chest breathing steadiness & breathPhase
     const upperSamples = m.breathing?.upperTrace || [];
     for (let i = 0; i < upperSamples.length; i += 1) {
       const sample = upperSamples[i];
@@ -222,8 +258,15 @@ export class SignalProcessor {
       this.breathSamples.shift();
     }
 
-    const { steadiness, wave } = this._computeBreathSteadiness();
-    this.lastBreathSteadiness = steadiness;
+    const { steadiness, wave, breathPhase } = this._computeBreathSteadiness();
+    if (!this.talking) {
+      this.lastBreathSteadiness = steadiness;
+    }
+    if (breathPhase !== null) {
+      this.breathPhaseEma = this.breathPhaseEma * 0.75 + breathPhase * 0.25;
+    } else {
+      this.breathPhaseEma = this.breathPhaseEma * 0.9;
+    }
 
     const rates = m.breathing?.rate || [];
     if (rates.length > 0) {
@@ -234,7 +277,7 @@ export class SignalProcessor {
       }
     }
 
-    // 4. Subtle Tonal Echo from expression probabilities
+    // 5. Calibrated Subtle Tonal Echo (resting laptop SAD:75% stays neutral)
     const exprs = m.face?.expression || [];
     if (exprs.length > 0) {
       const lastExp = exprs[exprs.length - 1];
@@ -247,14 +290,34 @@ export class SignalProcessor {
           heavy = Math.max(heavy, conf);
         }
       }
-      this.exprWarmEma = this.exprWarmEma * 0.78 + happy * 0.22;
-      this.exprHeavyEma = this.exprHeavyEma * 0.78 + heavy * 0.22;
-      if (this.exprWarmEma >= 38 && this.exprWarmEma > this.exprHeavyEma + 8) {
+      this.exprWarmEma = this.exprWarmEma * 0.82 + happy * 0.18;
+      this.exprHeavyEma = this.exprHeavyEma * 0.88 + heavy * 0.12;
+      if (this.exprWarmEma >= 45 && this.exprWarmEma > this.exprHeavyEma + 10) {
         this.echo = 'warm';
-      } else if (this.exprHeavyEma >= 38 && this.exprHeavyEma > this.exprWarmEma + 8) {
+      } else if (this.exprHeavyEma >= 78 && this.exprHeavyEma > this.exprWarmEma + 12) {
         this.echo = 'heavy';
-      } else if (this.exprWarmEma < 28 && this.exprHeavyEma < 28) {
+      } else if (this.exprWarmEma < 32 && this.exprHeavyEma < 58) {
         this.echo = 'neutral';
+      }
+    }
+
+    // 6. Opt-in cardio pulse rate (only populated when cardioMetrics requested, gated by confidence >= 40)
+    const pulseRates = m.cardio?.pulseRate || [];
+    if (pulseRates.length > 0) {
+      const lastPulse = pulseRates[pulseRates.length - 1];
+      const conf = Number(lastPulse?.confidence ?? 0);
+      this.latestPulseConfidence = Number(clamp(conf, 0, 100).toFixed(0));
+      this.latestPulseStable = Boolean(lastPulse?.stable);
+      if (
+        typeof lastPulse?.value === 'number' &&
+        Number.isFinite(lastPulse.value) &&
+        lastPulse.value > 25 &&
+        lastPulse.value < 240 &&
+        conf >= this.pulseConfidenceMin
+      ) {
+        this.latestPulseRate = Number(lastPulse.value.toFixed(1));
+      } else {
+        this.latestPulseRate = null;
       }
     }
 
@@ -267,10 +330,15 @@ export class SignalProcessor {
       gaze: this.gazeZone,
       gazeScalar: Number(this.gazeEma.toFixed(3)),
       breathSteadiness: this.lastBreathSteadiness,
+      breathPhase: Number(clamp(this.breathPhaseEma, -1, 1).toFixed(3)),
       breathRate: this.latestBreathRate,
       breathConfidence: this.latestBreathConfidence,
       breathWave: wave,
+      talking: this.talking,
       echo: this.echo,
+      pulseRate: this.latestPulseRate,
+      pulseConfidence: this.latestPulseConfidence,
+      pulseStable: this.latestPulseStable,
       silhouette: this.lastSilhouette,
     };
   }
@@ -278,23 +346,45 @@ export class SignalProcessor {
   _computeBreathSteadiness() {
     const arr = this.breathSamples;
     if (arr.length < 10) {
-      return { steadiness: this.lastBreathSteadiness, wave: [] };
+      return { steadiness: this.lastBreathSteadiness, wave: [], breathPhase: null };
     }
     const spanMs = arr[arr.length - 1].ts - arr[0].ts;
     if (spanMs < 1200) {
-      return { steadiness: this.lastBreathSteadiness, wave: [] };
+      return { steadiness: this.lastBreathSteadiness, wave: [], breathPhase: null };
     }
 
-    let mean = 0;
-    for (const s of arr) mean += s.value;
-    mean /= arr.length;
+    // OLS linear detrending removes slow posture/auto-exposure baseline drift observed in live webcam captures
+    const t0 = arr[0].ts;
+    let meanT = 0;
+    let meanY = 0;
+    const timesSec = new Array(arr.length);
+    for (let i = 0; i < arr.length; i += 1) {
+      const tSec = (arr[i].ts - t0) / 1000;
+      timesSec[i] = tSec;
+      meanT += tSec;
+      meanY += arr[i].value;
+    }
+    meanT /= arr.length;
+    meanY /= arr.length;
 
-    const centered = arr.map((s) => s.value - mean);
+    let covTY = 0;
+    let varT = 0;
+    for (let i = 0; i < arr.length; i += 1) {
+      const dt = timesSec[i] - meanT;
+      covTY += dt * (arr[i].value - meanY);
+      varT += dt * dt;
+    }
+    const slope = varT > 1e-9 ? covTY / varT : 0;
+    const intercept = meanY - slope * meanT;
+
+    const detrended = new Array(arr.length);
     let minV = Infinity;
     let maxV = -Infinity;
-    for (const v of centered) {
-      if (v < minV) minV = v;
-      if (v > maxV) maxV = v;
+    for (let i = 0; i < arr.length; i += 1) {
+      const r = arr[i].value - (intercept + slope * timesSec[i]);
+      detrended[i] = r;
+      if (r < minV) minV = r;
+      if (r > maxV) maxV = r;
     }
     const range = maxV - minV;
 
@@ -304,44 +394,46 @@ export class SignalProcessor {
     const halfSpan = Math.max(range / 2, 1e-4);
     for (let i = 0; i < targetLen; i += 1) {
       const idx = Math.min(
-        centered.length - 1,
-        Math.round((i / (targetLen - 1)) * (centered.length - 1))
+        detrended.length - 1,
+        Math.round((i / (targetLen - 1)) * (detrended.length - 1))
       );
-      wave.push(Number(clamp(centered[idx] / halfSpan, -1, 1).toFixed(3)));
+      wave.push(Number(clamp(detrended[idx] / halfSpan, -1, 1).toFixed(3)));
     }
 
-    // Flatline / screen-apnea check (no chest oscillation over window)
+    // Flatline / screen-apnea check (no chest oscillation after linear detrending)
     if (range < 1e-4) {
-      return { steadiness: 22, wave: new Array(targetLen).fill(0) };
+      return { steadiness: 22, wave: new Array(targetLen).fill(0), breathPhase: 0 };
     }
+
+    const latestPhase = clamp(detrended[detrended.length - 1] / halfSpan, -1, 1);
 
     // Smoothness metric: ratio of 2nd-difference curvature RMS to amplitude std
     let sumSq = 0;
-    for (const v of centered) sumSq += v * v;
-    const std = Math.sqrt(sumSq / centered.length);
+    for (const v of detrended) sumSq += v * v;
+    const std = Math.sqrt(sumSq / detrended.length);
 
     let d1Sq = 0;
-    for (let i = 1; i < centered.length; i += 1) {
-      const d = centered[i] - centered[i - 1];
+    for (let i = 1; i < detrended.length; i += 1) {
+      const d = detrended[i] - detrended[i - 1];
       d1Sq += d * d;
     }
-    const d1Rms = Math.sqrt(d1Sq / (centered.length - 1));
+    const d1Rms = Math.sqrt(d1Sq / (detrended.length - 1));
 
     let d2Sq = 0;
-    for (let i = 2; i < centered.length; i += 1) {
-      const d2 = centered[i] - 2 * centered[i - 1] + centered[i - 2];
+    for (let i = 2; i < detrended.length; i += 1) {
+      const d2 = detrended[i] - 2 * detrended[i - 1] + detrended[i - 2];
       d2Sq += d2 * d2;
     }
-    const d2Rms = Math.sqrt(d2Sq / Math.max(1, centered.length - 2));
+    const d2Rms = Math.sqrt(d2Sq / Math.max(1, detrended.length - 2));
 
     // For a clean 0.2 Hz respiratory sine sampled ~20-30Hz: d2Rms/std is tiny (<0.08),
-    // and d2Rms/d1Rms is well below 0.35. Erratic erratic/noisy jolts drive ratio > 1.0.
+    // and d2Rms/d1Rms is well below 0.35. Erratic jolts drive ratio > 1.0.
     const highFreqRatio = d2Rms / Math.max(d1Rms, 1e-6);
     const accelRatio = d2Rms / Math.max(std, 1e-6);
     const rawPenalty = highFreqRatio * 48 + accelRatio * 55;
     const score = Math.round(clamp(96 - rawPenalty, 12, 98));
 
-    return { steadiness: score, wave };
+    return { steadiness: score, wave, breathPhase: latestPhase };
   }
 }
 
