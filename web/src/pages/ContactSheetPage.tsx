@@ -21,6 +21,13 @@ export function ContactSheetPage() {
             .reduce((acc, r) => acc + r.avgBreathSteadiness, 0) / visitedCount
         )
       : 0;
+  const pulseRecords = records.filter((r) => r.holdSeconds > 0 && typeof r.avgPulseBpm === 'number');
+  const overallPulse =
+    pulseRecords.length > 0
+      ? (
+          pulseRecords.reduce((acc, r) => acc + (r.avgPulseBpm || 0), 0) / pulseRecords.length
+        ).toFixed(1)
+      : null;
 
   const handleDownload = () => {
     exportContactSheetPng(records, theme, report.source);
@@ -52,6 +59,12 @@ export function ContactSheetPage() {
             Total sitting <strong style={{ color: 'var(--ink)' }}>{totalHold.toFixed(1)}s</strong> ·{' '}
             <strong style={{ color: 'var(--pop)' }}>{totalBlinks} blink cuts</strong> · Average
             breath steadiness <strong style={{ color: 'var(--pop2)' }}>{avgBreath}%</strong>
+            {overallPulse && (
+              <>
+                {' '}
+                · Opt-in pulse <strong style={{ color: 'var(--pop)' }}>{overallPulse} bpm</strong>
+              </>
+            )}
           </p>
         </div>
 
@@ -113,28 +126,24 @@ export function ContactSheetPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-        {records.map((rec, idx) => {
-          const ribbon =
-            rec.breathRibbon.length > 1
-              ? rec.breathRibbon
-              : Array.from({ length: 24 }, (_, i) => Math.sin(i * 0.5 + idx) * 0.35);
-
-          const wavePath = ribbon
-            .map((v, wi) => {
-              const x = (wi / Math.max(1, ribbon.length - 1)) * 160;
-              const y = 14 - v * 10;
-              return `${wi === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-            })
-            .join(' ');
-
-          const gTotal = Math.max(
-            1,
-            rec.gazeCounts.left + rec.gazeCounts.center + rec.gazeCounts.right
-          );
-          const lPct = (rec.gazeCounts.left / gTotal) * 100;
-          const cPct = (rec.gazeCounts.center / gTotal) * 100;
-          const rPct = (rec.gazeCounts.right / gTotal) * 100;
+        {records.map((rec) => {
           const unvisited = rec.holdSeconds === 0;
+          const hasWave = !unvisited && rec.breathRibbon.length > 1;
+          const wavePath = hasWave
+            ? rec.breathRibbon
+                .map((v, wi) => {
+                  const x = (wi / Math.max(1, rec.breathRibbon.length - 1)) * 160;
+                  const y = 14 - v * 10;
+                  return `${wi === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+                })
+                .join(' ')
+            : '';
+
+          const gSum = rec.gazeCounts.left + rec.gazeCounts.center + rec.gazeCounts.right;
+          const hasGaze = !unvisited && gSum > 0;
+          const lPct = hasGaze ? (rec.gazeCounts.left / gSum) * 100 : 0;
+          const cPct = hasGaze ? (rec.gazeCounts.center / gSum) * 100 : 0;
+          const rPct = hasGaze ? (rec.gazeCounts.right / gSum) * 100 : 0;
 
           return (
             <article
@@ -163,30 +172,55 @@ export function ContactSheetPage() {
                   </div>
                   <h2 className="font-serif-ed text-base font-normal mt-1 mb-1">{rec.title}</h2>
                   <p className="text-xs leading-snug m-0" style={{ color: 'var(--ink-muted)' }}>
-                    {unvisited
-                      ? 'Not yet visited in this sitting.'
-                      : `${rec.unlockedHiddenCount}/3 hidden notes developed · Echo: ${rec.dominantEcho}`}
+                    {unvisited ? (
+                      'Not yet visited in this sitting.'
+                    ) : (
+                      <>
+                        {rec.unlockedHiddenCount}/3 hidden notes developed · Echo: {rec.dominantEcho}
+                        {typeof rec.avgPulseBpm === 'number' && (
+                          <span className="block mt-1 font-mono-tab" style={{ color: 'var(--pop)' }}>
+                            Pulse (§7.4): {rec.avgPulseBpm.toFixed(1)} bpm
+                          </span>
+                        )}
+                      </>
+                    )}
                   </p>
                 </div>
 
                 <div className="space-y-2 pt-2">
                   <svg viewBox="0 0 160 28" className="w-full h-7">
-                    <path
-                      d={wavePath}
-                      fill="none"
-                      stroke="var(--pop2)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
+                    {hasWave ? (
+                      <path
+                        d={wavePath}
+                        fill="none"
+                        stroke="var(--pop2)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    ) : (
+                      <line
+                        x1="0"
+                        y1="14"
+                        x2="160"
+                        y2="14"
+                        stroke="var(--line)"
+                        strokeWidth="1.5"
+                        strokeDasharray="4 4"
+                      />
+                    )}
                   </svg>
                   <div
                     className="h-1.5 rounded-full overflow-hidden flex"
                     style={{ background: 'var(--surface-alt)' }}
-                    title="Gaze distribution L / C / R"
+                    title={hasGaze ? 'Gaze distribution L / C / R' : 'No gaze samples recorded'}
                   >
-                    <span style={{ width: `${lPct}%`, background: 'var(--ink-muted)' }} />
-                    <span style={{ width: `${cPct}%`, background: 'var(--pop)' }} />
-                    <span style={{ width: `${rPct}%`, background: 'var(--pop2)' }} />
+                    {hasGaze && (
+                      <>
+                        <span style={{ width: `${lPct}%`, background: 'var(--ink-muted)' }} />
+                        <span style={{ width: `${cPct}%`, background: 'var(--pop)' }} />
+                        <span style={{ width: `${rPct}%`, background: 'var(--pop2)' }} />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
