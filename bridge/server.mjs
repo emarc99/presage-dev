@@ -223,6 +223,17 @@ async function main() {
   }, 1000);
 
   const clients = new Set();
+  let cachedCameras = listCamerasSafe();
+  let lastCameraRefreshMs = Date.now();
+
+  function refreshCameras(force = false) {
+    const now = Date.now();
+    if (force || now - lastCameraRefreshMs > 10000) {
+      cachedCameras = listCamerasSafe();
+      lastCameraRefreshMs = now;
+    }
+    return cachedCameras;
+  }
 
   function broadcast(payload) {
     const encoded = JSON.stringify(payload);
@@ -237,7 +248,7 @@ async function main() {
     return {
       type: 'status',
       state: activeState,
-      cameras: listCamerasSafe(),
+      cameras: cachedCameras,
       apiKeyConfigured: Boolean(getApiKey()),
       sdkAvailable: true,
       enableCardio: activeEnableCardio,
@@ -368,8 +379,13 @@ async function main() {
     });
 
     instance.on('validationStatus', (code, _ts, hint) => {
-      latestValidation = VALIDATION_NAMES.get(code) || String(code);
-      latestHint = hint || '';
+      const nextValidation = VALIDATION_NAMES.get(code) || String(code);
+      const nextHint = hint || '';
+      if (nextValidation === latestValidation && nextHint === latestHint) {
+        return;
+      }
+      latestValidation = nextValidation;
+      latestHint = nextHint;
       broadcast(buildStatusPayload());
     });
 
@@ -447,6 +463,7 @@ async function main() {
     }
 
     if (req.url?.startsWith('/health')) {
+      const cams = refreshCameras(false);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(
         JSON.stringify({
@@ -456,7 +473,7 @@ async function main() {
           state: activeState,
           enableCardio: activeEnableCardio,
           recording: Boolean(recordStream),
-          camerasCount: listCamerasSafe().length,
+          camerasCount: cams.length,
         })
       );
       return;
@@ -501,6 +518,7 @@ async function main() {
         return;
       }
       if (msg?.type === 'list_cameras') {
+        refreshCameras(true);
         ws.send(JSON.stringify(buildStatusPayload()));
       } else if (msg?.type === 'start') {
         retryCount = 0;

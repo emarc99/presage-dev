@@ -68,6 +68,18 @@ export function useSignals(onBlinkCut?: () => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const didAutoSelectRef = useRef(false);
   const pendingStartRef = useRef<{ cameraId?: string; enableCardio: boolean } | null>(null);
+  const lastSignalCommitMsRef = useRef(0);
+  const lastDiscreteRef = useRef<{
+    faceDetected: boolean;
+    gaze: GazeZone;
+    talking: boolean;
+    echo: TonalEcho;
+  }>({
+    faceDetected: false,
+    gaze: 'center',
+    talking: false,
+    echo: 'neutral',
+  });
   const onBlinkRef = useRef(onBlinkCut);
   onBlinkRef.current = onBlinkCut;
 
@@ -108,7 +120,7 @@ export function useSignals(onBlinkCut?: () => void) {
     void probeBridge();
   }, [probeBridge]);
 
-  // Connect WebSocket when user selects 'bridge' mode
+  // Connect WebSocket when user selects 'bridge' mode (auto-reconnects cleanly on bridge restart)
   useEffect(() => {
     if (source !== 'bridge') {
       pendingStartRef.current = null;
@@ -120,97 +132,140 @@ export function useSignals(onBlinkCut?: () => void) {
     }
 
     let closed = false;
-    const ws = new WebSocket(BRIDGE_WS);
-    wsRef.current = ws;
+    let reconnectTimer: number | null = null;
 
-    ws.onopen = () => {
+    const connect = () => {
       if (closed) return;
-      setBridgeAvailable(true);
-      setBridgeStatus((prev) => ({ ...prev, connected: true, error: null }));
-      if (pendingStartRef.current) {
-        const queued = pendingStartRef.current;
-        pendingStartRef.current = null;
-        ws.send(
-          JSON.stringify({
-            type: 'start',
-            cameraId: queued.cameraId || null,
-            enableCardio: queued.enableCardio,
-          })
-        );
-      }
-    };
+      const ws = new WebSocket(BRIDGE_WS);
+      wsRef.current = ws;
 
-    ws.onmessage = (ev) => {
-      if (closed) return;
-      try {
-        const msg = JSON.parse(String(ev.data));
-        if (msg.type === 'status') {
-          setBridgeStatus({
-            connected: true,
-            sdkAvailable: Boolean(msg.sdkAvailable),
-            apiKeyConfigured: Boolean(msg.apiKeyConfigured),
-            enableCardio: Boolean(msg.enableCardio),
-            recording: Boolean(msg.recording),
-            recordedCount: Number(msg.recordedCount ?? 0),
-            state: msg.state || 'idle',
-            cameras: msg.cameras || [],
-            validation: msg.validation || 'unknown',
-            validationHint: msg.validationHint || '',
-            error: msg.error || null,
-            errorCode: msg.errorCode || null,
-          });
-        } else if (msg.type === 'signal') {
-          if (msg.longBlinkPause) {
-            setPaused((p) => !p);
-          }
-          if (msg.blinkCut) {
-            onBlinkRef.current?.();
-          }
-          setSignal({
-            ts: msg.ts ?? Date.now(),
-            fps: msg.fps ?? 0,
-            faceDetected: Boolean(msg.faceDetected),
-            blinkCut: Boolean(msg.blinkCut),
-            longBlinkPause: Boolean(msg.longBlinkPause),
-            gaze: msg.gaze || 'center',
-            gazeScalar: typeof msg.gazeScalar === 'number' ? msg.gazeScalar : 0.5,
-            breathSteadiness:
-              typeof msg.breathSteadiness === 'number' ? msg.breathSteadiness : 55,
-            breathPhase: typeof msg.breathPhase === 'number' ? msg.breathPhase : 0,
-            breathRate: msg.breathRate ?? null,
-            breathConfidence: msg.breathConfidence ?? 0,
-            breathWave: Array.isArray(msg.breathWave) ? msg.breathWave : [],
-            talking: Boolean(msg.talking),
-            echo: msg.echo || 'neutral',
-            pulseRate: typeof msg.pulseRate === 'number' ? msg.pulseRate : null,
-            pulseConfidence: typeof msg.pulseConfidence === 'number' ? msg.pulseConfidence : 0,
-            pulseStable: Boolean(msg.pulseStable),
-            silhouette: Array.isArray(msg.silhouette) ? msg.silhouette : null,
-          });
+      ws.onopen = () => {
+        if (closed) return;
+        setBridgeAvailable(true);
+        setBridgeStatus((prev) => ({ ...prev, connected: true, error: null }));
+        if (pendingStartRef.current) {
+          const queued = pendingStartRef.current;
+          pendingStartRef.current = null;
+          ws.send(
+            JSON.stringify({
+              type: 'start',
+              cameraId: queued.cameraId || null,
+              enableCardio: queued.enableCardio,
+            })
+          );
         }
-      } catch {
-        // ignore malformed packets
-      }
+      };
+
+      ws.onmessage = (ev) => {
+        if (closed) return;
+        try {
+          const msg = JSON.parse(String(ev.data));
+          if (msg.type === 'status') {
+            setBridgeStatus({
+              connected: true,
+              sdkAvailable: Boolean(msg.sdkAvailable),
+              apiKeyConfigured: Boolean(msg.apiKeyConfigured),
+              enableCardio: Boolean(msg.enableCardio),
+              recording: Boolean(msg.recording),
+              recordedCount: Number(msg.recordedCount ?? 0),
+              state: msg.state || 'idle',
+              cameras: msg.cameras || [],
+              validation: msg.validation || 'unknown',
+              validationHint: msg.validationHint || '',
+              error: msg.error || null,
+              errorCode: msg.errorCode || null,
+            });
+          } else if (msg.type === 'signal') {
+            if (msg.longBlinkPause) {
+              setPaused((p) => !p);
+            }
+            if (msg.blinkCut) {
+              onBlinkRef.current?.();
+            }
+
+            const nextFace = Boolean(msg.faceDetected);
+            const nextGaze: GazeZone = msg.gaze || 'center';
+            const nextTalking = Boolean(msg.talking);
+            const nextEcho: TonalEcho = msg.echo || 'neutral';
+            const prevD = lastDiscreteRef.current;
+            const discreteChanged =
+              Boolean(msg.blinkCut) ||
+              Boolean(msg.longBlinkPause) ||
+              nextFace !== prevD.faceDetected ||
+              nextGaze !== prevD.gaze ||
+              nextTalking !== prevD.talking ||
+              nextEcho !== prevD.echo;
+
+            const nowPerf = performance.now();
+            if (!discreteChanged && nowPerf - lastSignalCommitMsRef.current < 80) {
+              return;
+            }
+            lastSignalCommitMsRef.current = nowPerf;
+            lastDiscreteRef.current = {
+              faceDetected: nextFace,
+              gaze: nextGaze,
+              talking: nextTalking,
+              echo: nextEcho,
+            };
+
+            setSignal({
+              ts: msg.ts ?? Date.now(),
+              fps: msg.fps ?? 0,
+              faceDetected: nextFace,
+              blinkCut: Boolean(msg.blinkCut),
+              longBlinkPause: Boolean(msg.longBlinkPause),
+              gaze: nextGaze,
+              gazeScalar: typeof msg.gazeScalar === 'number' ? msg.gazeScalar : 0.5,
+              breathSteadiness:
+                typeof msg.breathSteadiness === 'number' ? msg.breathSteadiness : 55,
+              breathPhase: typeof msg.breathPhase === 'number' ? msg.breathPhase : 0,
+              breathRate: msg.breathRate ?? null,
+              breathConfidence: msg.breathConfidence ?? 0,
+              breathWave: Array.isArray(msg.breathWave) ? msg.breathWave : [],
+              talking: nextTalking,
+              echo: nextEcho,
+              pulseRate: typeof msg.pulseRate === 'number' ? msg.pulseRate : null,
+              pulseConfidence: typeof msg.pulseConfidence === 'number' ? msg.pulseConfidence : 0,
+              pulseStable: Boolean(msg.pulseStable),
+              silhouette: Array.isArray(msg.silhouette) ? msg.silhouette : null,
+            });
+          }
+        } catch {
+          // ignore malformed packets
+        }
+      };
+
+      ws.onerror = () => {
+        if (closed) return;
+        setBridgeStatus((prev) => ({
+          ...prev,
+          connected: false,
+          error: 'Local SmartSpectra bridge not running on 127.0.0.1:4199',
+        }));
+      };
+
+      ws.onclose = () => {
+        if (closed) return;
+        setBridgeStatus((prev) => ({ ...prev, connected: false, state: 'idle' }));
+        if (wsRef.current === ws) wsRef.current = null;
+        if (reconnectTimer === null) {
+          reconnectTimer = window.setTimeout(() => {
+            reconnectTimer = null;
+            connect();
+          }, 1500);
+        }
+      };
     };
 
-    ws.onerror = () => {
-      if (closed) return;
-      setBridgeStatus((prev) => ({
-        ...prev,
-        connected: false,
-        error: 'Local SmartSpectra bridge not running on 127.0.0.1:4199',
-      }));
-    };
-
-    ws.onclose = () => {
-      if (closed) return;
-      setBridgeStatus((prev) => ({ ...prev, connected: false, state: 'idle' }));
-    };
+    connect();
 
     return () => {
       closed = true;
-      ws.close();
-      wsRef.current = null;
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, [source]);
 

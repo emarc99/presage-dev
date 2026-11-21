@@ -117,11 +117,12 @@ export function extractSilhouette(pts) {
 export class SignalProcessor {
   constructor(options = {}) {
     this.mirrorX = options.mirrorX ?? true;
-    this.earBlinkThreshold = options.earBlinkThreshold ?? 0.19;
+    this.earBlinkThreshold = options.earBlinkThreshold ?? 0.21;
     this.minBlinkGapMs = options.minBlinkGapMs ?? 360;
     this.maxQuickBlinkMs = options.maxQuickBlinkMs ?? 650;
     this.longBlinkMs = options.longBlinkMs ?? 1100;
-    this.talkingHoldMs = options.talkingHoldMs ?? 1200;
+    this.talkingHoldMs = options.talkingHoldMs ?? 900;
+    this.talkingOnsetFrames = options.talkingOnsetFrames ?? 5;
     this.breathWindowMs = options.breathWindowMs ?? 4500;
     this.gazeAlpha = options.gazeAlpha ?? 0.25;
     this.pulseConfidenceMin = options.pulseConfidenceMin ?? 40;
@@ -137,10 +138,12 @@ export class SignalProcessor {
     this.gazeZone = 'center';
     this.breathSamples = [];
     this.lastBreathSteadiness = 55;
+    this.hasComputedBreath = false;
     this.breathPhaseEma = 0;
     this.latestBreathRate = null;
     this.latestBreathConfidence = 0;
     this.lastTalkingMs = -Infinity;
+    this.talkingStreak = 0;
     this.talking = false;
     this.exprWarmEma = 0;
     this.exprHeavyEma = 0;
@@ -234,11 +237,15 @@ export class SignalProcessor {
       }
     }
 
-    // 3. Talking speech-artifact guard (1200ms gap-bridge)
-    for (const t of m.face?.talking || []) {
-      if (t?.detected) {
+    // 3. Talking speech-artifact guard (requires >=5 consecutive frames to engage, holds 900ms)
+    const anyTalking = (m.face?.talking || []).some((t) => Boolean(t?.detected));
+    if (anyTalking) {
+      this.talkingStreak += 1;
+      if (this.talkingStreak >= this.talkingOnsetFrames) {
         this.lastTalkingMs = nowMs;
       }
+    } else {
+      this.talkingStreak = Math.max(0, this.talkingStreak - 1);
     }
     this.talking = nowMs - this.lastTalkingMs <= this.talkingHoldMs;
 
@@ -259,8 +266,9 @@ export class SignalProcessor {
     }
 
     const { steadiness, wave, breathPhase } = this._computeBreathSteadiness();
-    if (!this.talking) {
+    if (wave.length > 0 && (!this.talking || !this.hasComputedBreath)) {
       this.lastBreathSteadiness = steadiness;
+      this.hasComputedBreath = true;
     }
     if (breathPhase !== null) {
       this.breathPhaseEma = this.breathPhaseEma * 0.75 + breathPhase * 0.25;
@@ -277,7 +285,7 @@ export class SignalProcessor {
       }
     }
 
-    // 5. Calibrated Subtle Tonal Echo (resting laptop SAD:75% stays neutral)
+    // 5. Calibrated Subtle Tonal Echo (resting laptop SAD ~80% stays neutral)
     const exprs = m.face?.expression || [];
     if (exprs.length > 0) {
       const lastExp = exprs[exprs.length - 1];
@@ -291,12 +299,12 @@ export class SignalProcessor {
         }
       }
       this.exprWarmEma = this.exprWarmEma * 0.82 + happy * 0.18;
-      this.exprHeavyEma = this.exprHeavyEma * 0.88 + heavy * 0.12;
+      this.exprHeavyEma = this.exprHeavyEma * 0.90 + heavy * 0.10;
       if (this.exprWarmEma >= 45 && this.exprWarmEma > this.exprHeavyEma + 10) {
         this.echo = 'warm';
-      } else if (this.exprHeavyEma >= 78 && this.exprHeavyEma > this.exprWarmEma + 12) {
+      } else if (this.exprHeavyEma >= 86 && this.exprHeavyEma > this.exprWarmEma + 15) {
         this.echo = 'heavy';
-      } else if (this.exprWarmEma < 32 && this.exprHeavyEma < 58) {
+      } else if (this.exprWarmEma < 32 && this.exprHeavyEma < 66) {
         this.echo = 'neutral';
       }
     }

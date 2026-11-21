@@ -31,7 +31,8 @@ export function ExperiencePage() {
 
   const scene = SCENES[sceneIdx];
   const beat = scene.beats[beatIdx];
-  const { signal, paused, setPaused } = signals;
+  const { signal, paused, setPaused, stopLiveBridge, manualBlink, manualGaze, manualBreath } =
+    signals;
 
   const latestSignalRef = useRef(signal);
   latestSignalRef.current = signal;
@@ -143,10 +144,10 @@ export function ExperiencePage() {
       setBeatIdx(0);
     } else {
       markCompleted();
-      signals.stopLiveBridge();
+      stopLiveBridge();
       navigate('/contact-sheet');
     }
-  }, [beatIdx, flushSceneStats, markCompleted, navigate, paused, resetSceneAccumulator, sceneIdx, signals]);
+  }, [beatIdx, flushSceneStats, markCompleted, navigate, paused, resetSceneAccumulator, sceneIdx, stopLiveBridge]);
 
   // Bind live blink handler from SmartSpectra / Sample Trace / Manual trigger
   useEffect(() => {
@@ -202,21 +203,22 @@ export function ExperiencePage() {
     soundscape.update(signal.breathSteadiness, signal.echo, signal.gaze, signal.breathPhase);
   }, [signal.breathSteadiness, signal.echo, signal.gaze, signal.breathPhase]);
 
-  // Smooth drift loop slowed by calm breathing
+  // Smooth drift loop slowed by calm breathing (~15 fps to avoid 60Hz SVG feGaussianBlur thrash)
   useEffect(() => {
     let rafId = 0;
-    const step = () => {
-      if (!paused) {
-        const speed = 1.15 - (signal.breathSteadiness / 100) * 0.85;
-        setParallaxOffset((prev) => (prev + 0.32 * speed) % 240);
+    let lastTick = performance.now();
+    const step = (now: number) => {
+      if (!paused && now - lastTick >= 66) {
+        const dtFactor = Math.min(2.5, (now - lastTick) / 16.67);
+        lastTick = now;
+        const speed = 1.15 - (latestSignalRef.current.breathSteadiness / 100) * 0.85;
+        setParallaxOffset((prev) => (prev + 0.32 * dtFactor * speed) % 240);
       }
       rafId = window.requestAnimationFrame(step);
     };
     rafId = window.requestAnimationFrame(step);
     return () => window.cancelAnimationFrame(rafId);
-  }, [paused, signal.breathSteadiness]);
-
-  const { manualBlink, manualGaze, manualBreath } = signals;
+  }, [paused]);
 
   const triggerManualBlink = useCallback(() => {
     manualBypassRef.current = true;
@@ -391,6 +393,40 @@ export function ExperiencePage() {
             }}
           />
         ))}
+      </div>
+
+      {/* Compact 1-Line Gesture Guide & Live Camera Cue */}
+      <div
+        className="rounded-xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs"
+        style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1" style={{ color: 'var(--ink-muted)' }}>
+          <span>
+            <strong style={{ color: 'var(--ink)' }}>Look L/C/R</strong> to shift focus
+          </span>
+          <span>·</span>
+          <span>
+            <strong style={{ color: 'var(--ink)' }}>Breathe steadily (≥ 60%)</strong> to sharpen &amp; unlock note
+          </span>
+          <span>·</span>
+          <span>
+            <strong style={{ color: 'var(--ink)' }}>Blink after 4.2 s</strong> to cut
+          </span>
+          <span>·</span>
+          <span>
+            <strong style={{ color: 'var(--ink)' }}>Hold 1.1 s</strong> to pause
+          </span>
+        </div>
+        {signals.source === 'bridge' &&
+          signals.bridgeStatus.validation !== 'kOk' &&
+          signals.bridgeStatus.validationHint && (
+            <span
+              className="font-mono-tab px-2 py-0.5 rounded-full shrink-0"
+              style={{ background: 'var(--pop-soft)', color: 'var(--pop)' }}
+            >
+              {signals.bridgeStatus.validationHint}
+            </span>
+          )}
       </div>
 
       {/* Interactive Layered SVG Stage */}

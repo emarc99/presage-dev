@@ -190,51 +190,95 @@ test('Pure linear posture slump without oscillation reads as flatline apnea, err
   assert.ok(erraticRes.breathSteadiness <= 40, `expected <=40, got ${erraticRes.breathSteadiness}`);
 });
 
-test('Talking speech-artifact guard holds breathSteadiness steady for 1200ms bridge window', () => {
+test('Talking speech-artifact guard ignores 2-frame stray flicker and engages after >=5 consecutive frames', () => {
+  // Startup guard: even if talking=true arrives during warmup before first breath wave, initial 55 is replaced
+  const startupProc = new SignalProcessor();
+  let warm;
+  for (let i = 0; i < 60; i += 1) {
+    const t = i * 40;
+    warm = startupProc.process(
+      {
+        face: { talking: [{ detected: true }] },
+        breathing: { upperTrace: [{ value: Math.sin((t / 1000) * Math.PI * 2 * 0.2) }] },
+      },
+      1000 + t
+    );
+  }
+  assert.equal(warm.talking, true);
+  assert.ok(warm.breathSteadiness >= 75, `expected warmup breath >=75, got ${warm.breathSteadiness}`);
+
   const proc = new SignalProcessor();
-  // First establish calm ~85 breathSteadiness
+  // Establish calm >=75 breathSteadiness
   let calm;
   for (let i = 0; i < 110; i += 1) {
     const t = i * 40;
     calm = proc.process({ breathing: { upperTrace: [{ value: Math.sin((t / 1000) * Math.PI * 2 * 0.2) }] } }, 1000 + t);
   }
   assert.ok(calm.breathSteadiness >= 75);
-  const frozenScore = calm.breathSteadiness;
 
-  // Speak + inject chaotic erratic chest noise for 900ms: score stays frozen and talking=true
+  // 2-frame stray mouth flicker must NOT set talking=true
+  let flicker;
+  for (let i = 110; i < 112; i += 1) {
+    const t = i * 40;
+    flicker = proc.process(
+      {
+        face: { talking: [{ detected: true }] },
+        breathing: { upperTrace: [{ value: Math.sin((t / 1000) * Math.PI * 2 * 0.2) }] },
+      },
+      1000 + t
+    );
+  }
+  assert.equal(flicker.talking, false);
+
+  // >=5 consecutive talking frames engages talking=true and freezes established breathSteadiness across 900ms hold window
   let whileTalking;
-  for (let i = 0; i < 20; i += 1) {
-    const t = 5500 + i * 45;
+  for (let i = 112; i < 118; i += 1) {
+    const t = i * 40;
     whileTalking = proc.process(
       {
-        face: { talking: [{ detected: i < 5 }] },
-        breathing: { upperTrace: [{ value: (i % 2 === 0 ? 3 : -3) }] },
+        face: { talking: [{ detected: true }] },
+        breathing: { upperTrace: [{ value: Math.sin((t / 1000) * Math.PI * 2 * 0.2) }] },
       },
-      t
+      1000 + t
+    );
+  }
+  const lockedScore = whileTalking.breathSteadiness;
+  assert.equal(whileTalking.talking, true);
+  assert.ok(lockedScore >= 75, `expected calm locked score >=75, got ${lockedScore}`);
+
+  // Inject chaotic erratic chest noise for ~720ms during talking hold: score stays frozen
+  for (let i = 0; i < 16; i += 1) {
+    const ts = 5720 + i * 45;
+    whileTalking = proc.process(
+      {
+        face: { talking: [{ detected: false }] },
+        breathing: { upperTrace: [{ value: i % 2 === 0 ? 3 : -3 }] },
+      },
+      ts
     );
   }
   assert.equal(whileTalking.talking, true);
-  assert.equal(whileTalking.breathSteadiness, frozenScore);
+  assert.equal(whileTalking.breathSteadiness, lockedScore);
 
-  // After >1200ms silence since last detected=true (t=5680 -> >6880), talking clears
-  const afterSilence = proc.process({ face: { talking: [{ detected: false }] } }, 7100);
+  // After >900ms silence since last active streak (last onset ts=5680 -> >6580), talking clears
+  const afterSilence = proc.process({ face: { talking: [{ detected: false }] } }, 6800);
   assert.equal(afterSilence.talking, false);
 });
 
-test('Expression calibration keeps resting SAD 75% neutral, triggers heavy only on sustained >=78%', () => {
+test('Expression calibration keeps resting SAD 80% neutral, triggers heavy only on sustained >=86%', () => {
   const proc = new SignalProcessor();
   let out;
 
-  // Resting webcam SAD ~75% must stay neutral (observed in live Windows capture)
-  for (let i = 0; i < 35; i += 1) {
+  // Resting webcam SAD ~80% must stay neutral
+  for (let i = 0; i < 40; i += 1) {
     out = proc.process(
       {
         face: {
           expression: [
             {
               scores: [
-                { type: EXPR_SAD, confidence: 75 },
-                { type: EXPR_NEUTRAL, confidence: 20 },
+                { type: EXPR_SAD, confidence: 80 },
+                { type: EXPR_NEUTRAL, confidence: 15 },
               ],
             },
           ],
@@ -245,16 +289,16 @@ test('Expression calibration keeps resting SAD 75% neutral, triggers heavy only 
   }
   assert.equal(out.echo, 'neutral');
 
-  // Sustained SAD 88% eventually warms EMA past >=78 -> heavy
-  for (let i = 0; i < 40; i += 1) {
+  // Sustained SAD 92% warms 0.90/0.10 EMA past >=86 -> heavy
+  for (let i = 0; i < 45; i += 1) {
     out = proc.process(
       {
         face: {
           expression: [
             {
               scores: [
-                { type: EXPR_SAD, confidence: 88 },
-                { type: EXPR_NEUTRAL, confidence: 8 },
+                { type: EXPR_SAD, confidence: 92 },
+                { type: EXPR_NEUTRAL, confidence: 5 },
               ],
             },
           ],
