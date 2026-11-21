@@ -65,6 +65,8 @@ export function useSignals(onBlinkCut?: () => void) {
   const [signal, setSignal] = useState<LiveSignalPacket>(DEFAULT_SIGNAL);
   const [paused, setPaused] = useState(false);
 
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   const wsRef = useRef<WebSocket | null>(null);
   const didAutoSelectRef = useRef(false);
   const pendingStartRef = useRef<{ cameraId?: string; enableCardio: boolean } | null>(null);
@@ -282,8 +284,17 @@ export function useSignals(onBlinkCut?: () => void) {
         let idx = 0;
         const step = () => {
           if (cancelled) return;
-          if (!paused) {
+          let nextDelayMs = 500;
+          if (!pausedRef.current) {
             const f = trace.frames[idx];
+            const nextIdx = (idx + 1) % trace.frames.length;
+            const nextFrame = trace.frames[nextIdx];
+            if (nextIdx > idx && nextFrame) {
+              nextDelayMs = Math.min(
+                1800,
+                Math.max(180, Math.round((nextFrame.t - f.t) * 1000))
+              );
+            }
             const phase = idx * 0.65;
             const wave = Array.from({ length: 36 }, (_, wi) =>
               Number(
@@ -312,9 +323,9 @@ export function useSignals(onBlinkCut?: () => void) {
               pulseConfidence: typeof f.pulseRate === 'number' ? 72 : 0,
               pulseStable: typeof f.pulseRate === 'number',
             }));
-            idx = (idx + 1) % trace.frames.length;
+            idx = nextIdx;
           }
-          timerId = window.setTimeout(step, 1800);
+          timerId = window.setTimeout(step, nextDelayMs);
         };
         step();
       })
@@ -326,7 +337,7 @@ export function useSignals(onBlinkCut?: () => void) {
       cancelled = true;
       if (timerId !== null) window.clearTimeout(timerId);
     };
-  }, [source, paused]);
+  }, [source]);
 
   const startLiveBridge = useCallback((cameraId?: string, enableCardio = false) => {
     const ws = wsRef.current;
