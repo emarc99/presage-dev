@@ -85,7 +85,9 @@ export function computeGazeScalar(pts, mirrorX = true) {
     yawRatio = clamp((pts[NOSE_TIP].x - cA) / cheekSpan, 0, 1);
   }
 
-  const raw = clamp(irisRatio * 0.7 + yawRatio * 0.3, 0, 1);
+  const irisDelta = irisRatio - 0.5;
+  const yawDelta = yawRatio - 0.5;
+  const raw = clamp(0.5 + irisDelta * 0.95 + yawDelta * 0.55, 0, 1);
   return mirrorX ? 1 - raw : raw;
 }
 
@@ -205,11 +207,11 @@ export class SignalProcessor {
         if (gazeRaw !== null) {
           this.gazeEma = this.gazeEma * (1 - this.gazeAlpha) + gazeRaw * this.gazeAlpha;
           if (this.gazeZone === 'center') {
-            if (this.gazeEma < 0.41) this.gazeZone = 'left';
-            else if (this.gazeEma > 0.59) this.gazeZone = 'right';
-          } else if (this.gazeZone === 'left' && this.gazeEma > 0.46) {
+            if (this.gazeEma < 0.455) this.gazeZone = 'left';
+            else if (this.gazeEma > 0.545) this.gazeZone = 'right';
+          } else if (this.gazeZone === 'left' && this.gazeEma > 0.478) {
             this.gazeZone = 'center';
-          } else if (this.gazeZone === 'right' && this.gazeEma < 0.54) {
+          } else if (this.gazeZone === 'right' && this.gazeEma < 0.522) {
             this.gazeZone = 'center';
           }
         }

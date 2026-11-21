@@ -151,6 +151,23 @@ test('Coarse 3-zone gaze switches reliably across left, center, and right', () =
   proc.process({ face: { landmarks: [{ value: lookCenter }] } }, 1200);
   res = proc.process({ face: { landmarks: [{ value: lookCenter }] } }, 1250);
   assert.equal(res.gaze, 'center');
+
+  // Subtle natural laptop eye glance (~8% iris offset, gazeOffset=0.25) with default smoothing
+  const naturalProc = new SignalProcessor({ mirrorX: true });
+  const subtleLeft = makeFaceLandmarks({ gazeOffset: 0.25 });
+  const subtleRight = makeFaceLandmarks({ gazeOffset: -0.25 });
+  for (let i = 0; i < 6; i += 1) {
+    res = naturalProc.process({ face: { landmarks: [{ value: subtleLeft }] } }, 2000 + i * 33);
+  }
+  assert.equal(res.gaze, 'left');
+  for (let i = 0; i < 8; i += 1) {
+    res = naturalProc.process({ face: { landmarks: [{ value: subtleRight }] } }, 2300 + i * 33);
+  }
+  assert.equal(res.gaze, 'right');
+  for (let i = 0; i < 8; i += 1) {
+    res = naturalProc.process({ face: { landmarks: [{ value: lookCenter }] } }, 2700 + i * 33);
+  }
+  assert.equal(res.gaze, 'center');
 });
 
 test('Linear detrending handles large upperTrace baseline drift without losing calm breath score or breathPhase', () => {
