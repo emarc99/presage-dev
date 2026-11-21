@@ -171,6 +171,24 @@ export function CalibratePage() {
                     >
                       Stop Camera
                     </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        signals.bridgeStatus.recording
+                          ? signals.stopRecording(true)
+                          : signals.startRecording()
+                      }
+                      className="px-3 py-1.5 rounded-lg cursor-pointer font-mono-tab"
+                      style={{
+                        background: signals.bridgeStatus.recording ? 'var(--pop2-soft)' : 'var(--surface-alt)',
+                        border: '1px solid var(--line)',
+                        color: signals.bridgeStatus.recording ? 'var(--pop2)' : 'var(--ink)',
+                      }}
+                    >
+                      {signals.bridgeStatus.recording
+                        ? `Stop & Save Sample (${signals.bridgeStatus.recordedCount})`
+                        : 'Record Sitting'}
+                    </button>
                   </div>
                 </div>
               )}

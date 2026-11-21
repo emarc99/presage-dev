@@ -36,11 +36,14 @@ export function Navbar() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         {/* Left Wordmark */}
         <Link to="/" className="flex items-center gap-2.5 no-underline shrink-0">
-          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9.5" fill="none" stroke="var(--ink)" strokeWidth="1.6" />
-            <circle cx="12" cy="12" r="4.2" fill="var(--pop)" />
-            <circle cx="12" cy="12" r="1.4" fill="var(--bg)" />
-          </svg>
+          <span
+            className="inline-flex items-center justify-center rounded-lg px-1.5 py-1 transition-colors"
+            style={{
+              background: theme === 'obsidian' ? '#FAF9F6' : 'transparent',
+            }}
+          >
+            <img src="/afterimage-logo.png" alt="AFTERIMAGE logo" className="h-6 w-auto block" />
+          </span>
           <span
             className="font-serif-ed text-lg font-semibold tracking-tight"
             style={{ color: 'var(--ink)' }}

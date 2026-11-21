@@ -4,7 +4,7 @@ import { useSession } from '../context/SessionContext';
 
 export function OverviewPage() {
   const navigate = useNavigate();
-  const { signals } = useSession();
+  const { signals, theme } = useSession();
 
   return (
     <main className="flex-1">
@@ -14,7 +14,14 @@ export function OverviewPage() {
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
             style={{ background: 'var(--pop-soft)', color: 'var(--pop)' }}
           >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--pop2)' }} />
+            <span
+              className="inline-flex items-center justify-center rounded-full px-1.5 py-0.5"
+              style={{
+                background: theme === 'obsidian' ? '#FAF9F6' : 'transparent',
+              }}
+            >
+              <img src="/afterimage-logo.png" alt="" className="h-4 w-auto block" />
+            </span>
             <span>Interactive Memory Essay · Webcam + Breath</span>
           </div>
 

@@ -6,7 +6,7 @@ import { exportContactSheetPng } from '../utils/exportSheet';
 
 export function ContactSheetPage() {
   const navigate = useNavigate();
-  const { report, theme, eraseSession } = useSession();
+  const { report, theme, signals, eraseSession } = useSession();
   const [toast, setToast] = useState<string | null>(null);
 
   const records = report.records;
@@ -29,8 +29,8 @@ export function ContactSheetPage() {
         ).toFixed(1)
       : null;
 
-  const handleDownload = () => {
-    exportContactSheetPng(records, theme, report.source);
+  const handleDownload = async () => {
+    await exportContactSheetPng(records, theme, report.source);
     setToast('Exported afterimage-contact-sheet.png cleanly (no raw video pixels stored).');
   };
 
@@ -103,6 +103,32 @@ export function ContactSheetPage() {
           </button>
         </div>
       </div>
+
+      {signals.bridgeStatus.recording && (
+        <div
+          className="px-4 py-3 rounded-xl text-xs font-mono-tab flex flex-wrap items-center justify-between gap-3"
+          style={{
+            background: 'var(--pop2-soft)',
+            color: 'var(--pop2)',
+            border: '1px solid var(--line)',
+          }}
+        >
+          <span>
+            RECORDING ACTIVE · {signals.bridgeStatus.recordedCount} signal frames captured
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              signals.stopRecording(true);
+              setToast('Saved live SmartSpectra trace to web/public/sample-trace.json + recordings/.');
+            }}
+            className="px-3.5 py-1.5 rounded-full font-semibold cursor-pointer"
+            style={{ background: 'var(--pop2)', color: 'var(--pop-contrast)' }}
+          >
+            Save Recording → sample-trace.json
+          </button>
+        </div>
+      )}
 
       {toast && (
         <div

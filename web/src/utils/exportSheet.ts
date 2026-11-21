@@ -238,12 +238,29 @@ function drawScenePlate(
   ctx.restore();
 }
 
-export function exportContactSheetPng(
+function loadLogoImage(): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timer = window.setTimeout(() => resolve(null), 1500);
+    img.onload = () => {
+      window.clearTimeout(timer);
+      resolve(img);
+    };
+    img.onerror = () => {
+      window.clearTimeout(timer);
+      resolve(null);
+    };
+    img.src = '/afterimage-logo.png';
+  });
+}
+
+export async function exportContactSheetPng(
   records: SceneRecord[],
   themeId: ThemeMeta['id'],
   source: SignalSource
 ) {
   const pal = THEME_PALETTE[themeId];
+  const logoImg = await loadLogoImage();
   const width = 1600;
   const height = 920;
   const cvs = document.createElement('canvas');
@@ -259,6 +276,25 @@ export function exportContactSheetPng(
   ctx.fillStyle = pal.ink;
   ctx.font = '38px Georgia, serif';
   ctx.fillText('AFTERIMAGE — Developed Contact Sheet', 64, 88);
+
+  if (logoImg) {
+    const boxX = width - 178;
+    const boxY = 44;
+    const boxW = 114;
+    const boxH = 78;
+    if (themeId === 'obsidian') {
+      ctx.fillStyle = '#FAF9F6';
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+      ctx.fill();
+    }
+    const scale = Math.min((boxW - 12) / logoImg.width, (boxH - 10) / logoImg.height);
+    const drawW = logoImg.width * scale;
+    const drawH = logoImg.height * scale;
+    const drawX = boxX + (boxW - drawW) / 2;
+    const drawY = boxY + (boxH - drawH) / 2;
+    ctx.drawImage(logoImg, drawX, drawY, drawW, drawH);
+  }
 
   const visited = records.filter((r) => r.holdSeconds > 0);
   const totalSec = records.reduce((s, r) => s + r.holdSeconds, 0);

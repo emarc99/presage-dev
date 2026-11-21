@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./web/public/afterimage-logo.png" alt="AFTERIMAGE Logo" width="180" />
+</p>
+
 # AFTERIMAGE
 
 > *Memories slip every time you blink. Breathe steady to hold them still.*
