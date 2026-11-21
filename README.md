@@ -6,11 +6,11 @@
 
 > *Memories slip every time you blink. Breathe steady to hold them still.*
 
-**AFTERIMAGE** is a five-scene interactive visual essay driven by your eyes and breath via the **Presage SmartSpectra Node.js SDK (`@smartspectra/node-sdk@3.5.0`)**. Inspired by Academy Award–winning film editor **Walter Murch's *In the Blink of an Eye*** (the observation that a human blink is the mind's natural film cut, punctuating one thought from the next alongside the rhythm of breathing) and the blink-driven memory storytelling of ***Before Your Eyes***, AFTERIMAGE treats involuntary signals as photographic controls inside a 35mm darkroom: where you look shifts focus across each triptych scene, rolling chest-breath steadiness clears optical haze to reveal hidden marginalia, and every natural blink turns the page—ending in an exportable **Contact Sheet (`.png`)** of your sitting.
+**AFTERIMAGE** is a five-scene interactive visual essay driven by your eyes and breath via the **Presage SmartSpectra Node.js SDK (`@smartspectra/node-sdk@3.5.0`)**. Inspired by Academy Award–winning film editor **Walter Murch's *In the Blink of an Eye*** (the observation that a human blink is the mind's natural film cut, punctuating one thought from the next alongside the rhythm of breathing) and the blink-driven memory storytelling of ***Before Your Eyes***, AFTERIMAGE treats involuntary signals as photographic controls inside a 35mm darkroom: where you look shifts focus across each triptych scene, rolling chest-breath steadiness clears optical haze to reveal hidden marginalia, and every natural blink turns the page after a `4.2 s` **Shutter Armed** dwell—ending in an exportable **Contact Sheet (`.png`)** of your sitting.
 
 Built as a submission for the [Presage SmartSpectra SDK Challenge](https://dev.to/challenges/presage-2026-11-04).
 
-- **Interactive Preview (Vercel):** https://afterimage-presage.vercel.app *(plays a real 366-frame Windows SmartSpectra sitting at 1× pace or Keyboard mode)*
+- **Interactive Preview (Vercel):** https://afterimage-presage.vercel.app *(replays a real `366`-keyframe Windows SmartSpectra sitting at 1× pace or Keyboard Interactive mode)*
 - **Source Code:** https://github.com/emarc99/presage-dev
 
 <p align="center">
@@ -19,15 +19,40 @@ Built as a submission for the [Presage SmartSpectra SDK Challenge](https://dev.t
 
 ---
 
+## Visual Walkthrough
+
+| Step 01 · Darkroom Calibration (`/calibrate`) | Step 02 · Triptych Essay (`/experience`) |
+| :---: | :---: |
+| <img src="./web/public/calibrate-darkroom.png" alt="Darkroom calibration screen with explicit camera consent, §7.4 pulse toggle, and geometric silhouette reticle" width="420" /> | <img src="./web/public/experience-triptych.png" alt="Plate I Morning Steam triptych showing Center Ceramic Cup focus, SHUTTER ARMED pill, and unlocked cobalt marginalia" width="420" /> |
+| *Explicit pre-capture consent gate, `§7.4` `cardioMetrics` disclosure toggle, and normalized 478-landmark line-art silhouette (never raw video).* | *Left / Center / Right triptych focus, chest-breath de-haze (`72%`), `4.2 s` `SHUTTER ARMED` lock, and unlocked cobalt italic marginalia.* |
+
+---
+
 ## How It Responds to Human Signals
 
-| Signal | SmartSpectra Source | How AFTERIMAGE Uses It |
-| :--- | :--- | :--- |
-| **Natural Blink (Reopen)** | `face.blinking` + scale-invariant Eye Aspect Ratio (`face.landmarks`, `earBlinkThreshold = 0.21`) | Blink-on-reopen (`< 650 ms`, `360 ms` debounce) triggers a shutter cut once the beat's **`4.2 s` Shutter Armed** dwell completes (early blinks show an aperture ripple; `Space` cuts immediately). Deliberate long closure (`>= 1.1 s`) toggles pause/resume without prematurely cutting. |
-| **Coarse Eye Gaze** | Additive iris (`468`, `473`) + jaw/cheek yaw deviation (`< 0.455 / > 0.545`, `0.478 / 0.522` return) | Shifts active triptych focus (`Left` / `Center` / `Right`) with smooth `420 ms` crossfade, stereo audio pan, parallax depth, and zone captions. |
-| **Chest Breath Steadiness** | Rolling `4.5 s` OLS linear-detrended `breathing.upperTrace` + `breathing.rate` | Removes slow posture/auto-exposure baseline drift, computes smoothness + `breathPhase` (`[-1..1]`) to drive steam/dust/halo motion, filtered pink-noise ambience, optical de-haze, and hidden marginalia chime unlocks. Protected by a `>= 5`-frame onset & `900 ms` hold `face.talking` speech-artifact guard. |
-| **Subtle Tonal Echo** | `face.expression` probabilities | Calibrated thresholds (`heavy >= 86%` with `0.90/0.10` EMA, `warm >= 45%` with `0.82/0.18` EMA) keep resting neutral expressions steady while shifting lighting warmth and WebAudio detune on sustained changes. |
-| **Optical Pulse (Opt-in)** | `cardio.pulseRate` (`cardioMetrics`, **OFF by default**) | Optional opt-in toggle on `/calibrate` with explicit §7.4 and skin-tone disclosure. Values below `40%` confidence are suppressed (`null`). |
+| Signal | SmartSpectra Source | How AFTERIMAGE Processes It | Effect in the Room |
+| :--- | :--- | :--- | :--- |
+| **Quick Blink Cut** | `face.landmarks` (478 pixel pts) + `face.blinking` | Scale-invariant 6-pt EAR (`< 0.21`), triggered **on reopen** (`< 650 ms`, `360 ms` debounce) after `4.2 s` **Shutter Armed** dwell | Aperture click sound + hard cut across 15 beats (`I–V`); early blinks ripple instead of cutting |
+| **Long Eye-Close Pause** | Prolonged low EAR (`< 0.21` held `>= 1.1 s`) | Buffered closure suppresses `face.blinking` pulses after `400 ms` so pauses never trigger an accidental cut | Toggles pause / resume without advancing beat |
+| **Horizontal Gaze (`L / C / R`)** | Iris centers (`468`, `473`) + nose/cheek `yawRatio` | Additive deviation around center (`0.5 + irisDelta * 0.95 + yawDelta * 0.55`), `< 0.455 / > 0.545` with return hysteresis | Shifts sharp panel (`420 ms` crossfade), parallax depth, zone captions, and stereo WebAudio pan |
+| **Chest Breath Steadiness** | `breathing.upperTrace` + `breathing.rate` + `face.talking` | `4.5 s` OLS linear detrend + 2nd-diff curvature steadiness + `>= 5`-frame talking onset (`900 ms` hold) guard | Clears SVG blur (`feGaussianBlur`), slows drift velocity, swells pink-noise bed; `>= 60%` rings chime & unlocks hidden note |
+| **Subtle Tonal Echo** | `face.expression` (`HAPPY`, `SAD`, `FEAR`, `ANGRY`, `NEUTRAL`) | `0.82/0.18` warm (`>= 45%`), `0.90/0.10` heavy (`>= 86%`) EMA to tolerate downward laptop camera angles | Subtle color temperature & ambient chord detune (`neutral` / `warm` / `heavy`) |
+| **Optical Pulse (Opt-in)** | `cardio.pulseRate` (`cardioMetrics`, **OFF by default**) | Confidence-gated (`>= 40%`, else `null`); never steers scene timing or unlocks | Displayed read-only on `/calibrate` and `/contact-sheet` only when explicitly toggled ON |
+
+---
+
+## Sitting 1 vs. Sitting 2 Calibration Progression
+
+| Run | Duration & Frames | Breath Clarity | Gaze Split (`L / C / R`) | Notes Unlocked | What Broke / What Fixed It |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Pre-flight probe** | `0 s` (`kInputUnavailable`) | — | — | — | `CameraSelection.front` failed on Windows MediaFoundation; `checkDeviceReadiness()` stalled for 30 s. Switched directly to `CameraSelection.default` / `.byId()` (`~7 s` lock at `29–31 Hz`). |
+| **Sitting 1** *(broken pipeline)* | `151.4 s`, `15` blink cuts | Froze at `55%` on startup (`67%` after clearing) | **100% Center** (`0.486–0.493`) | `15/15` | 30 Hz `availableCameras()` + `validationStatus` storm starved React; 1-frame startup `face.talking` froze `55%`; `0.7*iris + 0.3*yaw` pinned gaze at Center. |
+| **Sitting 2** *(calibrated)* | **`205.5 s`**, **`366` keyframes** (`308` `breathRate` msgs) | **`63%` avg** (`37–85%` range) | **`91` Left / `235` Center / `40` Right** | **`11/15`** (`3,3,1,1,3`) | Cached camera enumeration, deduplicated status broadcasts, `>= 5`-frame talking guard, OLS detrending, additive iris+yaw deviation (`0.95 / 0.55`). |
+
+<p align="center">
+  <img src="./web/public/contact-sheet-run1-center-locked.png" alt="Sitting 1 Contact Sheet showing 100% solid blue Center gaze bars prior to additive iris+yaw fix" width="760" />
+</p>
+<p align="center"><em>Sitting 1 (151.4 s) before the additive iris + yaw fix: all five bottom gaze bars are flat cobalt Center. Compare with Sitting 2 at the top of this README (91 Left / 235 Center / 40 Right).</em></p>
 
 ---
 
@@ -45,7 +70,7 @@ Use the top-right switcher in the navigation bar at any time across all four pag
 
 - **Camera stays off until explicit consent:** Video capture never opens until you check consent and start capture on `/calibrate` (or automatically reconnects safely across `/calibrate` -> `/experience` via serialized bridge stream reuse).
 - **No raw frames stored or sent to the browser:** The native Node host captures at `960×540 @ 30fps` locally (`127.0.0.1:4199`) and forwards only normalized geometric contour points and scalar breath/gaze/blink values over WebSocket (`enableTelemetry: false`). Microphone audio is never requested or opened.
-- **No `cardioMetrics` by default (Presage Privacy Policy §7.4):** Requesting only `faceMetrics + breathingMetrics` ensures reliable tracking without camera rPPG skin-tone bias and **avoids triggering Presage's automatic Presage → Anthropic LLM Insights pipeline (§7.4 of the Nov 3, 2026 SmartSpectra SDK Privacy Policy)**.
+- **No `cardioMetrics` by default (Presage Privacy Policy §7.4):** Requesting only `faceMetrics + breathingMetrics` ensures reliable tracking without camera rPPG skin-tone bias and **avoids triggering Presage's automatic Presage → Anthropic LLM Insights pipeline (§7.4 of the SmartSpectra SDK Privacy Policy)**.
 - **Optional opt-in `cardioMetrics` toggle (`/calibrate`):** You can explicitly switch ON optical pulse (`cardioMetrics`) during calibration after reviewing the inline disclosure: enabling `cardioMetrics` transmits physiological pulse telemetry subject to Presage §7.4 Anthropic LLM Insights processing, and camera rPPG reliability drops in dim light or across darker skin tones (Fitzpatrick V–VI), so readings below `40%` confidence are hidden (`null`) and pulse never drives scene pacing.
 - **One-click erasure:** Erase in-memory session metrics anytime from `/contact-sheet`.
 
@@ -80,14 +105,14 @@ Useful diagnostics & trace recording:
 npm run cameras                                            # Enumerate native cameras (no key required)
 npm run spike -- --skip-readiness --seconds 20             # Print live 1 Hz SmartSpectra metrics in terminal
 node bridge/server.mjs --record recordings/sitting.jsonl   # Record sanitized signal frames to JSONL (plus WS record_start / record_stop with saveAsSample -> web/public/sample-trace.json)
-npm test                                                   # Run deterministic SignalProcessor unit tests
+npm test                                                   # Run 9 deterministic SignalProcessor unit tests
 ```
 
 ### 2. Vercel Hosting (Interactive Preview + Real Recorded Sample Replay)
 
 Live deployment: **https://afterimage-presage.vercel.app**
 
-Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, it cannot run inside browsers or Vercel serverless functions. [vercel.json](./vercel.json) builds and deploys the lightweight React + Vite app (`web/`) directly to Vercel so reviewers can explore the full multi-page experience via **Recorded Sample Trace** (bundling a real 366-keyframe, `213.28 s` Windows webcam capture in [`web/public/sample-trace.json`](./web/public/sample-trace.json)) or **Keyboard Interactive Mode** (`Space` = Instant Blink Cut, `←/↑/→` = Gaze, `Shift` / slider = Breath):
+Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, it cannot run inside browsers or Vercel serverless functions. [vercel.json](./vercel.json) builds and deploys the lightweight React + Vite app (`web/`) directly to Vercel so reviewers can explore the full multi-page experience via **Recorded Sample Trace** (bundling a real `366`-keyframe, `201.95 s` span / `t = 11.33 → 213.28 s` Windows webcam capture in [`web/public/sample-trace.json`](./web/public/sample-trace.json)) or **Keyboard Interactive Mode** (`Space` = Instant Blink Cut, `←/↑/→` = Gaze, `Shift` / slider = Breath):
 
 ```bash
 vercel --prod
@@ -110,7 +135,7 @@ Building and testing AFTERIMAGE on Windows x64 (`Node v24.9.0`, `Integrated Came
 1. **`CameraSelection.front` vs. `CameraSelection.default` on Windows MediaFoundation:** Native Windows camera enumeration reports integrated laptop webcams with `facing="unknown"` and `lensType="unknown"`. Passing `CameraSelection.front` fails with `kInputUnavailable`; `CameraSelection.default` and `CameraSelection.byId(id)` lock reliably at `29–31 Hz`.
 2. **`checkDeviceReadiness()` 30 s Probe & Session Teardown:** `sdk.checkDeviceReadiness()` destroys any active session and runs a separate 30-second `reference720p30('full')` readiness pass before returning. Starting `useCamera(..., { width: 960, height: 540, fps: 30 })` directly transitions through initial framing hints (`kChestNotVisible` → `kTooDark` → `kFaceTooHigh` → `kOk`) and hits `kRunning` in ~7 seconds.
 3. **Isotropic Pixel Landmarks (`[316..564, 10..350]`), Not Normalized `[0..1]`:** `@smartspectra/node-sdk` outputs `face.landmarks` (`478` points including iris centers `468` & `473`) in raw frame pixel coordinates rather than normalized `[0..1]`, so `computeMeanEar`, `computeGazeScalar`, and `extractSilhouette` normalize by local eye-corner, cheek, and face-oval spans.
-4. **MediaFoundation Auto-Exposure Collapse & `upperTrace` Baseline Drift:** On laptop USB camera drivers without manual AE lock or gain registers, SmartSpectra's exposure lock collapses brightness (`luma=18.8 vs pre-lock 81.3`) and safely logs `exposure reverted to AUTO`. Active auto-exposure plus natural posture shifts cause `breathing.upperTrace` to drift across `[-6.842..+3.256]` over 10 s; running **OLS linear detrending** over a rolling `4.5 s` window isolates the true respiratory oscillation.
+4. **MediaFoundation Auto-Exposure Collapse & `upperTrace` Baseline Drift:** On laptop USB camera drivers without manual AE lock or gain registers, SmartSpectra's exposure lock collapses brightness (`luma=18.8254 vs pre-lock 81.3485`) and logs `mediafoundation_camera_source.cc:3019 [exposure-topup] ... exposure reverted to AUTO`. Active auto-exposure plus natural posture shifts cause `breathing.upperTrace` to drift across `[-6.842..+3.256]` over 10 s; running **OLS linear detrending** over a rolling `4.5 s` window isolates the true respiratory oscillation.
 5. **`breathing.upperTrace.stable` Waits on `breathing.rate` (~20 s Warmup):** Although `upperTrace` streams valid 30 Hz chest displacement within 2 seconds of `kRunning`, its `stable` flag stays `false` for 20+ seconds while `breathing.rate` warms up. Scoring detrended 2nd-difference curvature directly over `upperTrace` makes breath de-haze responsive immediately without stalling on `stable`.
 6. **Blink-on-Reopen (`< 650 ms`, `EAR < 0.21`) vs. Long-Blink Pause (`>= 1.1 s`):** Firing cuts on eyelid drop falsely triggers a scene cut at the start of a deliberate `1.1 s` long-blink pause. Measuring open-eye baseline (`ear ≈ 0.298–0.313` on live capture) and emitting `blinkCut` only **on reopen** when closure lasted `< 650 ms`—while suppressing `face.blinking` pulses once closed `>= 400 ms`—cleanly separates quick blinks from long pauses.
 7. **Additive Iris + Jaw Yaw Gaze Fusion (`91 / 235 / 40` L/C/R Split):** Blending `0.7 * iris + 0.3 * yaw` damped subtle eye glances across a 14" laptop screen (`gazeScalar` stayed stuck at `0.486–0.493`). Switching to additive deviation around `0.5` (`0.5 + irisDelta * 0.95 + yawDelta * 0.55`) with `< 0.455 / > 0.545` thresholds produced balanced multi-zone `L / C / R` tracking across our `205.5 s` (`366`-keyframe) recorded sitting.
