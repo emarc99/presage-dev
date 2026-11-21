@@ -10,16 +10,23 @@
 
 Built as a submission for the [Presage SmartSpectra SDK Challenge](https://dev.to/challenges/presage-2026-11-04).
 
+- **Interactive Preview (Vercel):** https://afterimage-presage.vercel.app *(plays a real 366-frame Windows SmartSpectra sitting at 1× pace or Keyboard mode)*
+- **Source Code:** https://github.com/emarc99/presage-dev
+
+<p align="center">
+  <img src="./web/public/contact-sheet-sample.png" alt="AFTERIMAGE Developed Contact Sheet (205.5s Live Windows Sitting)" width="780" />
+</p>
+
 ---
 
 ## How It Responds to Human Signals
 
 | Signal | SmartSpectra Source | How AFTERIMAGE Uses It |
 | :--- | :--- | :--- |
-| **Natural Blink (Reopen)** | `face.blinking` + scale-invariant Eye Aspect Ratio (`face.landmarks`) | Blink-on-reopen (`< 650 ms`, `360 ms` debounce) triggers a shutter cut once the beat's **`4.2 s` Shutter Armed** dwell completes (early blinks show an aperture ripple; `Space` cuts immediately). Deliberate long closure (`>= 1.1 s`) toggles pause/resume without prematurely cutting. |
-| **Coarse Eye Gaze** | Iris landmarks (`468`, `473`) + jaw/cheek yaw (`face.landmarks`) | Shifts active triptych focus (`Left` / `Center` / `Right`) with smooth `420 ms` crossfade, stereo audio pan, parallax depth, and zone captions. |
-| **Chest Breath Steadiness** | Rolling `4.5 s` OLS linear-detrended `breathing.upperTrace` + `breathing.rate` | Removes slow posture/auto-exposure baseline drift, computes smoothness + `breathPhase` (`[-1..1]`) to drive steam/dust/halo motion, filtered pink-noise ambience, optical de-haze, and hidden marginalia chime unlocks. Protected by a `1200 ms` `face.talking` speech-artifact guard. |
-| **Subtle Tonal Echo** | `face.expression` probabilities | Calibrated thresholds (`heavy >= 78%` with `alpha = 0.12` EMA, `warm >= 45%` with `alpha = 0.18` EMA) keep resting neutral expressions steady while shifting lighting warmth and WebAudio detune on sustained changes. |
+| **Natural Blink (Reopen)** | `face.blinking` + scale-invariant Eye Aspect Ratio (`face.landmarks`, `earBlinkThreshold = 0.21`) | Blink-on-reopen (`< 650 ms`, `360 ms` debounce) triggers a shutter cut once the beat's **`4.2 s` Shutter Armed** dwell completes (early blinks show an aperture ripple; `Space` cuts immediately). Deliberate long closure (`>= 1.1 s`) toggles pause/resume without prematurely cutting. |
+| **Coarse Eye Gaze** | Additive iris (`468`, `473`) + jaw/cheek yaw deviation (`< 0.455 / > 0.545`, `0.478 / 0.522` return) | Shifts active triptych focus (`Left` / `Center` / `Right`) with smooth `420 ms` crossfade, stereo audio pan, parallax depth, and zone captions. |
+| **Chest Breath Steadiness** | Rolling `4.5 s` OLS linear-detrended `breathing.upperTrace` + `breathing.rate` | Removes slow posture/auto-exposure baseline drift, computes smoothness + `breathPhase` (`[-1..1]`) to drive steam/dust/halo motion, filtered pink-noise ambience, optical de-haze, and hidden marginalia chime unlocks. Protected by a `>= 5`-frame onset & `900 ms` hold `face.talking` speech-artifact guard. |
+| **Subtle Tonal Echo** | `face.expression` probabilities | Calibrated thresholds (`heavy >= 86%` with `0.90/0.10` EMA, `warm >= 45%` with `0.82/0.18` EMA) keep resting neutral expressions steady while shifting lighting warmth and WebAudio detune on sustained changes. |
 | **Optical Pulse (Opt-in)** | `cardio.pulseRate` (`cardioMetrics`, **OFF by default**) | Optional opt-in toggle on `/calibrate` with explicit §7.4 and skin-tone disclosure. Values below `40%` confidence are suppressed (`null`). |
 
 ---
@@ -76,9 +83,11 @@ node bridge/server.mjs --record recordings/sitting.jsonl   # Record sanitized si
 npm test                                                   # Run deterministic SignalProcessor unit tests
 ```
 
-### 2. Vercel Hosting (Interactive Preview + Sample Replay)
+### 2. Vercel Hosting (Interactive Preview + Real Recorded Sample Replay)
 
-Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, it cannot run inside browsers or Vercel serverless functions. [vercel.json](./vercel.json) builds and deploys the lightweight React + Vite app (`web/`) directly to Vercel so reviewers can explore the full multi-page experience via **Recorded Sample Trace** replay or **Keyboard Interactive Mode** (`Space` = Instant Blink Cut, `←/↑/→` = Gaze, `Shift` / slider = Breath):
+Live deployment: **https://afterimage-presage.vercel.app**
+
+Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, it cannot run inside browsers or Vercel serverless functions. [vercel.json](./vercel.json) builds and deploys the lightweight React + Vite app (`web/`) directly to Vercel so reviewers can explore the full multi-page experience via **Recorded Sample Trace** (bundling a real 366-keyframe, `213.28 s` Windows webcam capture in [`web/public/sample-trace.json`](./web/public/sample-trace.json)) or **Keyboard Interactive Mode** (`Space` = Instant Blink Cut, `←/↑/→` = Gaze, `Shift` / slider = Breath):
 
 ```bash
 vercel --prod
@@ -88,9 +97,9 @@ vercel --prod
 
 ## Architecture
 
-- [`bridge/signal-processor.mjs`](./bridge/signal-processor.mjs) — Scale-invariant EAR blink-on-reopen debouncer, `1.1 s` long-blink pause detector, `1200 ms` `face.talking` guard, coarse L/C/R iris gaze estimator, OLS linear-detrended `4.5 s` chest-breath steadiness + `breathPhase` scorer, calibrated tonal echo smoother, confidence-gated (`>= 40%`) opt-in `cardio.pulseRate`, and normalized silhouette extractor.
-- [`bridge/server.mjs`](./bridge/server.mjs) — Serialized-mutex localhost HTTP + WebSocket bridge streaming processed metrics from `@smartspectra/node-sdk` (`faceMetrics + breathingMetrics` by default, opt-in `cardioMetrics`, `enableTelemetry: false`), optional JSONL recorder / sample-trace writer, and static server for `web/dist`.
-- [`web/`](./web) — React 19 + Vite + TypeScript + Tailwind v4 SPA featuring bespoke breath-reactive inline `<svg>` scenes, pink-noise + chime WebAudio soundscape, `4.2 s` Shutter Armed dwell UX, and 5-plate Canvas PNG Contact Sheet export (`1600×920`).
+- [`bridge/signal-processor.mjs`](./bridge/signal-processor.mjs) — Scale-invariant EAR blink-on-reopen debouncer (`earBlinkThreshold = 0.21`), `1.1 s` long-blink pause detector, `>= 5`-frame onset & `900 ms` hold `face.talking` guard, additive iris + yaw deviation gaze estimator (`< 0.455 / > 0.545`), OLS linear-detrended `4.5 s` chest-breath steadiness + `breathPhase` scorer, calibrated tonal echo smoother, confidence-gated (`>= 40%`) opt-in `cardio.pulseRate`, and normalized silhouette extractor.
+- [`bridge/server.mjs`](./bridge/server.mjs) — Serialized-mutex localhost HTTP + WebSocket bridge with cached camera enumeration and change-filtered validation status streaming processed metrics from `@smartspectra/node-sdk` (`faceMetrics + breathingMetrics` by default, opt-in `cardioMetrics`, `enableTelemetry: false`), optional JSONL recorder / `web/public/sample-trace.json` exporter, and static server for `web/dist`.
+- [`web/`](./web) — React 19 + Vite + TypeScript + Tailwind v4 SPA featuring bespoke breath-reactive inline `<svg>` scenes, pink-noise + chime WebAudio soundscape, `4.2 s` Shutter Armed dwell UX, `366`-frame `recorded_sitting` 1× sample replay, and 5-plate Canvas PNG Contact Sheet export (`1600×920`).
 
 ---
 
