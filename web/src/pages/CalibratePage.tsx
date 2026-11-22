@@ -214,7 +214,7 @@ export function CalibratePage() {
                   Optional Optical Pulse (<code className="font-mono-tab">cardioMetrics</code>)
                 </div>
                 <div className="font-mono-tab text-[11px]" style={{ color: 'var(--ink-muted)' }}>
-                  Default: OFF · Opt-in required · Read §7.4 &amp; equity notice
+                  Default: OFF · Opt-in · Presage §7.4 &amp; rPPG notice
                 </div>
               </div>
               <button
@@ -239,17 +239,13 @@ export function CalibratePage() {
               </button>
             </div>
             <p className="m-0 leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-              <strong>Presage §7.4 Disclosure:</strong> Leaving this OFF requests only{' '}
-              <code className="font-mono-tab">faceMetrics + breathingMetrics</code>, so pulse and HRV
-              are never computed or buffered. Per Presage SDK Privacy Policy §7.4 and the LLM
-              Insights docs, the SDK still auto-dispatches short derived numeric summaries (
-              <code className="font-mono-tab">breathing.rate</code>, plus pulse/HRV when cardio is
-              enabled — never raw video) to Presage&apos;s Analytics Gateway / Anthropic LLM service
-              and cannot currently be turned off by developers; AFTERIMAGE never calls{' '}
-              <code className="font-mono-tab">requestInsight()</code> or shows LLM insights.
-              Camera rPPG also degrades in dim light and darker skin tones (Fitzpatrick V–VI), so
-              opt-in pulse readings under 40% confidence stay hidden (
-              <code className="font-mono-tab">null</code>) and never drive pacing.
+              <strong>§7.4 Notice:</strong> OFF runs{' '}
+              <code className="font-mono-tab">faceMetrics + breathingMetrics</code> only (no pulse/HRV).
+              Per Presage §7.4, the SDK still auto-sends derived numeric summaries—never video—to
+              Presage/Anthropic (<code className="font-mono-tab">requestInsight()</code> is never
+              called). Optical rPPG degrades in dim light and darker skin (Fitzpatrick V–VI);{' '}
+              <code className="font-mono-tab">&lt; 40%</code> confidence stays{' '}
+              <code className="font-mono-tab">null</code> and never drives pacing.
             </p>
           </div>
 
@@ -266,8 +262,7 @@ export function CalibratePage() {
                 />
               </svg>
               <span>
-                <strong>Zero raw video saved:</strong> frames decode in native memory and drop
-                immediately.
+                <strong>No raw video saved:</strong> frames decode locally and drop immediately.
               </span>
             </li>
             <li className="flex items-start gap-3">
@@ -282,8 +277,7 @@ export function CalibratePage() {
                 />
               </svg>
               <span>
-                <strong>Inclusive breathing trace:</strong> chest displacement works reliably without
-                cardio rPPG skin-tone bias.
+                <strong>Inclusive breath optics:</strong> chest motion avoids rPPG skin-tone bias.
               </span>
             </li>
             <li className="flex items-start gap-3">
@@ -298,10 +292,9 @@ export function CalibratePage() {
                 />
               </svg>
               <span>
-                <strong>Honest §7.4 &amp; telemetry defaults:</strong>{' '}
-                <code className="font-mono-tab">enableTelemetry: false</code>,{' '}
-                <code className="font-mono-tab">requestInsight()</code> is never called, and{' '}
-                <code className="font-mono-tab">cardioMetrics</code> stays OFF unless opted in.
+                <strong>Minimal SDK defaults:</strong>{' '}
+                <code className="font-mono-tab">enableTelemetry: false</code>, no{' '}
+                <code className="font-mono-tab">requestInsight()</code>, cardio OFF.
               </span>
             </li>
           </ul>
