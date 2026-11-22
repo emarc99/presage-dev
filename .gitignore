@@ -10,9 +10,10 @@ recordings/
 .env*
 !web/public/afterimage-logo.png
 !web/public/favicon.png
-!web/public/contact-sheet-sample.png
-!web/public/contact-sheet-solar-coral.png
-!web/public/contact-sheet-run1-center-locked.png
-!web/public/calibrate-darkroom.png
-!web/public/experience-triptych.png
+!web/public/calibrate-darkroom-v3.png
+!web/public/experience-triptych-v3.png
+!web/public/contact-sheet-v1-sitting1-center-locked.png
+!web/public/contact-sheet-v2-sitting2-silent.png
+!web/public/contact-sheet-v2b-solar-coral-flatlines.png
+!web/public/contact-sheet-v3-sitting3-narrated.png
 !web/public/cover-banner.jpg
