@@ -69,7 +69,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [consented, setConsented] = useState(true);
-  // Strictly opt-in (OFF by default): avoids Presage §7.4 automatic Anthropic LLM Insights unless explicitly chosen
+  // Strictly opt-in (OFF by default) so pulse/HRV are never computed or buffered unless chosen; §7.4 auto-fired summaries are disclosed on /calibrate
   const [enableCardio, setEnableCardio] = useState(false);
   const [selectedCameraId, setSelectedCameraId] = useState('');
   const [soundMuted, setSoundMuted] = useState(false);

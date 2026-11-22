@@ -340,8 +340,8 @@ async function main() {
     processor.reset();
     broadcast(buildStatusPayload());
 
-    // cardioMetrics is strictly opt-in (OFF by default). Presage SDK Privacy Policy §7.4
-    // notes automatic Presage -> Anthropic LLM Insights processing on cloud cardio requests.
+    // cardioMetrics is strictly opt-in (OFF by default) so pulse/HRV are never computed or
+    // buffered; §7.4 auto-fired summaries for active metrics are disclosed on /calibrate.
     const requestedMetrics = nextConfig.enableCardio
       ? [...faceMetrics, ...breathingMetrics, ...cardioMetrics]
       : [...faceMetrics, ...breathingMetrics];

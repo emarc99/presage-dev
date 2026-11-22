@@ -113,8 +113,10 @@ export function OverviewPage() {
             <div className="space-y-1.5">
               <div className="text-sm font-semibold">Strict Privacy Default</div>
               <p className="text-xs leading-relaxed m-0" style={{ color: 'var(--ink-muted)' }}>
-                Microphone stays off. Cardio stays disabled by default so Presage §7.4 LLM Insights
-                cloud telemetry is never triggered.
+                Microphone stays off, <code>enableTelemetry</code> is false, and{' '}
+                <code>cardioMetrics</code> stays OFF by default so pulse and HRV are never
+                computed. Presage §7.4 auto-fired vitals summaries are disclosed upfront on{' '}
+                <code>/calibrate</code>.
               </p>
             </div>
           </div>

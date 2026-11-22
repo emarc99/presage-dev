@@ -118,8 +118,8 @@ async function main() {
     return;
   }
 
-  // Explicitly request faceMetrics + breathingMetrics ONLY (no cardioMetrics),
-  // avoiding Nov 3 Privacy Policy §7.4 automatic Anthropic LLM Insights telemetry.
+  // Request faceMetrics + breathingMetrics ONLY (cardioMetrics stays OFF so pulse/HRV are
+  // never computed or buffered; §7.4 auto-fired summaries for active metrics are disclosed).
   const requestedMetrics = [...faceMetrics, ...breathingMetrics];
   const sdk = new SmartSpectraSDK({
     apiKey,

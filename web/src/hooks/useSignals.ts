@@ -59,7 +59,7 @@ interface SampleTraceFrame {
 }
 
 export function useSignals(onBlinkCut?: () => void) {
-  const [source, setSource] = useState<SignalSource>('keyboard');
+  const [source, setSource] = useState<SignalSource>('sample');
   const [bridgeAvailable, setBridgeAvailable] = useState<boolean | null>(null);
   const [bridgeStatus, setBridgeStatus] = useState<BridgeStatus>(DEFAULT_STATUS);
   const [signal, setSignal] = useState<LiveSignalPacket>(DEFAULT_SIGNAL);
@@ -107,7 +107,7 @@ export function useSignals(onBlinkCut?: () => void) {
         }));
         if (!didAutoSelectRef.current && data.ok && sdkAvailable && apiKeyConfigured) {
           didAutoSelectRef.current = true;
-          setSource((prev) => (prev === 'keyboard' ? 'bridge' : prev));
+          setSource((prev) => (prev === 'sample' || prev === 'keyboard' ? 'bridge' : prev));
         }
         return true;
       }
@@ -312,6 +312,7 @@ export function useSignals(onBlinkCut?: () => void) {
               faceDetected: true,
               blinkCut: f.blinkCut,
               gaze: f.gaze,
+              gazeScalar: f.gaze === 'left' ? 0.28 : f.gaze === 'right' ? 0.72 : 0.5,
               breathSteadiness: f.breathSteadiness,
               breathPhase: syntheticPhase,
               breathRate: f.breathRate,

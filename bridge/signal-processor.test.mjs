@@ -1,9 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   SignalProcessor,
   computeMeanEar,
   computeGazeScalar,
+  extractSilhouette,
   EXPR_HAPPY,
   EXPR_SAD,
   EXPR_NEUTRAL,
@@ -365,4 +368,169 @@ test('Opt-in cardio pulseRate passes values only when confidence >= 40', () => {
   assert.equal(highConf.pulseRate, 68.4);
   assert.equal(highConf.pulseConfidence, 74);
   assert.equal(highConf.pulseStable, true);
+});
+
+test('Blink reopen cutoff: 649ms closure fires blinkCut while 650ms does not', () => {
+  const openPts = makeFaceLandmarks({ ear: 0.32 });
+  const closedPts = makeFaceLandmarks({ ear: 0.12 });
+
+  const fastProc = new SignalProcessor();
+  fastProc.process({ face: { landmarks: [{ value: openPts }] } }, 1000);
+  fastProc.process({ face: { landmarks: [{ value: closedPts }] } }, 1100);
+  assert.equal(fastProc.process({ face: { landmarks: [{ value: openPts }] } }, 1749).blinkCut, true);
+
+  const slowProc = new SignalProcessor();
+  slowProc.process({ face: { landmarks: [{ value: openPts }] } }, 1000);
+  slowProc.process({ face: { landmarks: [{ value: closedPts }] } }, 1100);
+  assert.equal(slowProc.process({ face: { landmarks: [{ value: openPts }] } }, 1750).blinkCut, false);
+});
+
+test('Long blink pause boundary: 1099ms does not pause, 1100ms fires once without re-firing', () => {
+  const proc = new SignalProcessor();
+  const closedPts = makeFaceLandmarks({ ear: 0.12 });
+
+  assert.equal(proc.process({ face: { landmarks: [{ value: closedPts }] } }, 1000).longBlinkPause, false);
+  assert.equal(proc.process({ face: { landmarks: [{ value: closedPts }] } }, 2099).longBlinkPause, false);
+  assert.equal(proc.process({ face: { landmarks: [{ value: closedPts }] } }, 2100).longBlinkPause, true);
+  assert.equal(proc.process({ face: { landmarks: [{ value: closedPts }] } }, 2400).longBlinkPause, false);
+});
+
+test('Gaze return hysteresis holds left/right through neutral deadband until return thresholds', () => {
+  const proc = new SignalProcessor({ mirrorX: true, gazeAlpha: 1.0 });
+
+  // Enter left (<0.455) then hold inside [0.455..0.478], exit only above 0.478
+  assert.equal(proc.process({ face: { landmarks: [{ value: makeFaceLandmarks({ gazeOffset: 0.2 }) }] } }, 1000).gaze, 'left');
+  const holdLeft = proc.process({ face: { landmarks: [{ value: makeFaceLandmarks({ gazeOffset: 0.09 }) }] } }, 1050);
+  assert.ok(holdLeft.gazeScalar > 0.455 && holdLeft.gazeScalar < 0.478);
+  assert.equal(holdLeft.gaze, 'left');
+  assert.equal(proc.process({ face: { landmarks: [{ value: makeFaceLandmarks({ gazeOffset: 0.05 }) }] } }, 1100).gaze, 'center');
+
+  // Enter right (>0.545) then hold inside [0.522..0.545], exit only below 0.522
+  assert.equal(proc.process({ face: { landmarks: [{ value: makeFaceLandmarks({ gazeOffset: -0.2 }) }] } }, 1150).gaze, 'right');
+  const holdRight = proc.process({ face: { landmarks: [{ value: makeFaceLandmarks({ gazeOffset: -0.08 }) }] } }, 1200);
+  assert.ok(holdRight.gazeScalar > 0.522 && holdRight.gazeScalar < 0.545);
+  assert.equal(holdRight.gaze, 'right');
+  assert.equal(proc.process({ face: { landmarks: [{ value: makeFaceLandmarks({ gazeOffset: -0.05 }) }] } }, 1250).gaze, 'center');
+});
+
+test('mirrorX: false inverts horizontal gaze polarity relative to mirrorX: true', () => {
+  const pts = makeFaceLandmarks({ gazeOffset: 0.4 });
+  const mirrored = computeGazeScalar(pts, true);
+  const unmirrored = computeGazeScalar(pts, false);
+  assert.ok(mirrored !== null && unmirrored !== null);
+  assert.ok(mirrored < 0.45 && unmirrored > 0.55);
+  assert.ok(Math.abs(mirrored + unmirrored - 1) < 1e-6);
+});
+
+test('extractSilhouette normalizes 960x540 pixel coordinates strictly into [0..1] and guards short arrays', () => {
+  assert.equal(extractSilhouette(null), null);
+  assert.equal(extractSilhouette([{ x: 100, y: 100 }]), null);
+
+  const pxPts = makeFaceLandmarks({ scaleX: 960, scaleY: 540 });
+  const sil = extractSilhouette(pxPts);
+  assert.equal(sil.length, 36);
+  for (const pt of sil) {
+    assert.ok(pt.x >= 0 && pt.x <= 1, `normalized x out of bounds: ${pt.x}`);
+    assert.ok(pt.y >= 0 && pt.y <= 1, `normalized y out of bounds: ${pt.y}`);
+  }
+});
+
+test('Rolling 4.5s breath window prunes stale history and recovers after a 5s face gap', () => {
+  const proc = new SignalProcessor();
+  // First jolt period (0..4.5s)
+  for (let i = 0; i < 60; i += 1) {
+    proc.process({ breathing: { upperTrace: [{ value: i % 2 === 0 ? 4 : -4 }] } }, 1000 + i * 50);
+  }
+  assert.ok(proc.breathSamples.length > 0 && proc.breathSamples.length <= 60);
+
+  // Gap > 4.5s followed by clean sine wave should prune old jolts cleanly
+  let res;
+  for (let i = 0; i < 60; i += 1) {
+    const t = 10000 + i * 50;
+    res = proc.process(
+      { breathing: { upperTrace: [{ value: Math.sin((t / 1000) * Math.PI * 2 * 0.25) }] } },
+      t
+    );
+  }
+  assert.equal(proc.breathSamples[0].ts >= 10000 - 4500 + 2950 - 4500, true);
+  assert.ok(res.breathSamples === undefined && res.breathSteadiness >= 75, `expected recovery >=75, got ${res.breathSteadiness}`);
+});
+
+test('Breath rate & confidence rounding handle decimals and reject non-finite values', () => {
+  const proc = new SignalProcessor();
+  const valid = proc.process({ breathing: { rate: [{ value: 14.36, confidence: 82.6 }] } }, 1000);
+  assert.equal(valid.breathRate, 14.4);
+  assert.equal(valid.breathConfidence, 83);
+
+  const invalid = proc.process({ breathing: { rate: [{ value: Number.NaN, confidence: 90 }] } }, 2000);
+  assert.equal(invalid.breathRate, 14.4);
+});
+
+test('Opt-in cardio pulse rejects out-of-range rates (<=25 or >=240 bpm) even at high confidence', () => {
+  const proc = new SignalProcessor();
+  assert.equal(
+    proc.process({ cardio: { pulseRate: [{ value: 25, confidence: 95, stable: true }] } }, 1000).pulseRate,
+    null
+  );
+  assert.equal(
+    proc.process({ cardio: { pulseRate: [{ value: 240, confidence: 95, stable: true }] } }, 2000).pulseRate,
+    null
+  );
+  assert.equal(
+    proc.process({ cardio: { pulseRate: [{ value: 62.34, confidence: 40, stable: false }] } }, 3000).pulseRate,
+    62.3
+  );
+});
+
+test('Expression hysteresis recovers both warm and heavy back to neutral', () => {
+  const proc = new SignalProcessor();
+  for (let i = 0; i < 25; i += 1) {
+    proc.process({ face: { expression: [{ scores: [{ type: EXPR_HAPPY, confidence: 75 }] }] } }, 1000 + i * 40);
+  }
+  assert.equal(proc.echo, 'warm');
+
+  let out;
+  for (let i = 0; i < 25; i += 1) {
+    out = proc.process(
+      { face: { expression: [{ scores: [{ type: EXPR_NEUTRAL, confidence: 90 }, { type: EXPR_HAPPY, confidence: 0 }] }] } },
+      2500 + i * 40
+    );
+  }
+  assert.equal(out.echo, 'neutral');
+});
+
+test('reset() clears blink timers, breath buffer, talking streak, echo, pulse, and silhouette', () => {
+  const proc = new SignalProcessor();
+  const pts = makeFaceLandmarks({ ear: 0.31, gazeOffset: 0.5 });
+  for (let i = 0; i < 40; i += 1) {
+    proc.process(
+      {
+        face: {
+          landmarks: [{ value: pts }],
+          talking: [{ detected: true }],
+          expression: [{ scores: [{ type: EXPR_HAPPY, confidence: 80 }] }],
+        },
+        breathing: { upperTrace: [{ value: Math.sin(i * 0.2) }], rate: [{ value: 15, confidence: 90 }] },
+        cardio: { pulseRate: [{ value: 70, confidence: 85, stable: true }] },
+      },
+      1000 + i * 40
+    );
+  }
+  proc.reset();
+  const empty = proc.process({}, 5000);
+  assert.equal(empty.gaze, 'center');
+  assert.equal(empty.breathSteadiness, 55);
+  assert.equal(empty.breathRate, null);
+  assert.equal(empty.pulseRate, null);
+  assert.equal(empty.talking, false);
+  assert.equal(empty.echo, 'neutral');
+  assert.equal(empty.silhouette, null);
+});
+
+test('Server privacy contract: enableTelemetry stays false, cardio defaults off, and requestInsight() is never called', () => {
+  const serverPath = path.resolve(import.meta.dirname, 'server.mjs');
+  const src = fs.readFileSync(serverPath, 'utf8');
+  assert.match(src, /enableTelemetry:\s*false/);
+  assert.match(src, /let activeEnableCardio = false;/);
+  assert.ok(!src.includes('requestInsight('));
 });

@@ -5,7 +5,7 @@ import type { SignalSource } from '../types/signals';
 
 const SOURCES: { id: SignalSource; label: string; hint: string }[] = [
   { id: 'bridge', label: 'Live Bridge (ws://4199)', hint: 'Uses your local webcam via SmartSpectra SDK.' },
-  { id: 'sample', label: 'Recorded Sample Trace', hint: 'Replays a 2.5 min session on Vercel.' },
+  { id: 'sample', label: 'Recorded Sample Trace', hint: 'Replays a real 366-frame Windows SmartSpectra sitting.' },
   { id: 'keyboard', label: 'Keyboard Interactive', hint: 'Control blinks (Space), gaze (arrows), breath slider.' },
 ];
 
@@ -240,13 +240,16 @@ export function CalibratePage() {
             </div>
             <p className="m-0 leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
               <strong>Presage §7.4 Disclosure:</strong> Leaving this OFF requests only{' '}
-              <code className="font-mono-tab">faceMetrics + breathingMetrics</code> and avoids automatic
-              Presage → Anthropic LLM Insights. Turning it ON adds{' '}
-              <code className="font-mono-tab">cardioMetrics</code>, which transmits physiological pulse
-              telemetry eligible for Presage SDK Privacy Policy §7.4 Anthropic LLM Insights processing
-              on Presage&apos;s cloud. Camera rPPG also degrades in dim light and darker skin tones
-              (Fitzpatrick V–VI), so readings under 40% confidence stay hidden (<code className="font-mono-tab">null</code>)
-              and never drive pacing.
+              <code className="font-mono-tab">faceMetrics + breathingMetrics</code>, so pulse and HRV
+              are never computed or buffered. Per Presage SDK Privacy Policy §7.4 and the LLM
+              Insights docs, the SDK still auto-dispatches short derived numeric summaries (
+              <code className="font-mono-tab">breathing.rate</code>, plus pulse/HRV when cardio is
+              enabled — never raw video) to Presage&apos;s Analytics Gateway / Anthropic LLM service
+              and cannot currently be turned off by developers; AFTERIMAGE never calls{' '}
+              <code className="font-mono-tab">requestInsight()</code> or shows LLM insights.
+              Camera rPPG also degrades in dim light and darker skin tones (Fitzpatrick V–VI), so
+              opt-in pulse readings under 40% confidence stay hidden (
+              <code className="font-mono-tab">null</code>) and never drive pacing.
             </p>
           </div>
 
@@ -295,8 +298,10 @@ export function CalibratePage() {
                 />
               </svg>
               <span>
-                <strong>No Anthropic §7.4 cloud Insights:</strong> defaults strictly to{' '}
-                <code className="font-mono-tab">faceMetrics + breathingMetrics</code>.
+                <strong>Honest §7.4 &amp; telemetry defaults:</strong>{' '}
+                <code className="font-mono-tab">enableTelemetry: false</code>,{' '}
+                <code className="font-mono-tab">requestInsight()</code> is never called, and{' '}
+                <code className="font-mono-tab">cardioMetrics</code> stays OFF unless opted in.
               </span>
             </li>
           </ul>

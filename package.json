@@ -11,7 +11,9 @@
     "dev:web": "npm --prefix web run dev",
     "build": "npm --prefix web run build",
     "start": "node bridge/server.mjs",
-    "test": "node --test bridge/signal-processor.test.mjs"
+    "test": "node --test bridge/signal-processor.test.mjs",
+    "verify-trace": "node scripts/verify-trace.mjs",
+    "check": "npm test && npm run verify-trace && npm run build"
   },
   "dependencies": {
     "@smartspectra/node-sdk": "3.5.0",
