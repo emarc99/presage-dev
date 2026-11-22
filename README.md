@@ -10,14 +10,14 @@
 
 Built as a solo submission for the [Presage SmartSpectra SDK Challenge](https://dev.to/challenges/presage-2026-11-04).
 
-- **Interactive Preview (Vercel):** https://afterimage-presage.vercel.app *(boots automatically into **Recorded Sample Trace** mode replaying `366` keyframes from a real Windows SmartSpectra sitting at 1× pace, or **Keyboard Interactive** mode)*
+- **Interactive Preview (Vercel):** https://afterimage-presage.vercel.app *(boots automatically into **Recorded Sample Trace** mode replaying `670` keyframes across `352.4 s` from a real narrated Windows SmartSpectra sitting at 1× pace, or **Keyboard Interactive** mode)*
 - **Source Code:** https://github.com/emarc99/presage-dev
 - **Windows Hardware & SDK Log:** [`docs/SDK-NOTES.md`](./docs/SDK-NOTES.md)
 
 <p align="center">
-  <img src="./web/public/contact-sheet-sample.png" alt="AFTERIMAGE Developed Contact Sheet exported from Sitting 2 (205.5s Live Windows Bridge)" width="780" />
+  <img src="./web/public/contact-sheet-sample.png" alt="AFTERIMAGE Developed Contact Sheet exported from Sitting 3 (239.2s Live Windows Bridge)" width="780" />
 </p>
-<p align="center"><em>Sitting 2 Contact Sheet PNG exported from the live Windows webcam bridge: 205.5 s, 15 armed blink cuts (out of 26 raw blinks), 63% 5-plate breath clarity (63.9% mean across 366 trace keyframes), 91 Left / 235 Center / 40 Right gaze frames, and 11/15 hidden notes developed.</em></p>
+<p align="center"><em>Sitting 3 Contact Sheet PNG exported from the live Windows webcam bridge: 239.2 s, 15 blink cuts, 72% breath clarity, AVG PULSE 75.4 BPM (opt-in §7.4: 71.8 / 77.1 / 77.2 bpm on Plates II–IV, honestly suppressed on Plate I pre-toggle and Plate V extreme left gaze), and 15/15 hidden notes developed.</em></p>
 
 ---
 
@@ -25,8 +25,8 @@ Built as a solo submission for the [Presage SmartSpectra SDK Challenge](https://
 
 | `/calibrate` (`Recorded Sample Trace` capture) | `/experience` (`Recorded Sample Trace` capture) |
 | :---: | :---: |
-| <img src="./web/public/calibrate-darkroom.png" alt="Darkroom calibration screen in Recorded Sample Trace mode showing explicit camera consent, §7.4 pulse toggle, and normalized 478-landmark reticle" width="420" /> | <img src="./web/public/experience-triptych.png" alt="Plate I Morning Steam during Recorded Sample Trace playback showing FOCUS SHARP 76%, Center Ceramic Cup focus, SHUTTER ARMED, and developed italic marginalia" width="420" /> |
-| *Explicit pre-capture consent, corrected §7.4 `cardioMetrics` opt-in notice, and normalized 478-landmark vector silhouette.* | *Replaying `sample-trace.json`: `Sample Trace` active, `FOCUS SHARP · 76%`, `SHUTTER ARMED · BLINK TO CUT`, and unlocked cobalt marginalia.* |
+| <img src="./web/public/calibrate-darkroom.png" alt="Darkroom calibration screen in Recorded Sample Trace mode showing explicit camera consent, §7.4 pulse toggle, and normalized 478-landmark reticle" width="420" /> | <img src="./web/public/experience-triptych.png" alt="Plate I Morning Steam during Recorded Sample Trace playback showing FOCUS SHARP 87%, Center Ceramic Cup focus, SHUTTER ARMED, and developed italic marginalia" width="420" /> |
+| *Explicit pre-capture consent, concise §7.4 `cardioMetrics` opt-in disclosure, and 478-point silhouette reticle (`Chest Wave 72%`).* | *Replaying `670`-frame `sample-trace.json`: `FOCUS SHARP · 87%`, `SHUTTER ARMED · BLINK TO CUT`, Center Ceramic Cup sharp, and cobalt marginalia unlocked.* |
 
 ---
 
@@ -34,27 +34,33 @@ Built as a solo submission for the [Presage SmartSpectra SDK Challenge](https://
 
 | Signal | SmartSpectra Source | How AFTERIMAGE Processes It | Effect in the Room |
 | :--- | :--- | :--- | :--- |
-| **Quick Blink Cut** | `face.landmarks` (478 pixel pts) + `face.blinking` | Scale-invariant 6-pt EAR (`< 0.21`), triggered **on reopen** (`< 650 ms`, `360 ms` debounce) after `4.2 s` **Shutter Armed** dwell | Aperture click sound + hard cut across 15 beats (`I–V`); early reading blinks (`11` in Sitting 2) ripple instead of cutting |
-| **Long Eye-Close Pause** | Prolonged low EAR (`< 0.21` held `>= 1.1 s`) | Buffered closure suppresses `face.blinking` pulses after `400 ms` so pauses never trigger an accidental cut | Toggles pause / resume without advancing beat |
+| **Quick Blink Cut** | `face.landmarks` (478 pixel pts) + `face.blinking` | Scale-invariant 6-pt EAR (`< 0.21`) triggered **on reopen** (`< 650 ms`, `360 ms` debounce) with `0.25` EAR native-descent guard + `4.2 s` **Shutter Armed** dwell | Aperture click sound + hard cut across 15 beats (`I–V`); early reading blinks (`30` across the full `352.4 s` sitting) ripple silently |
+| **Long Eye-Close Pause** | Prolonged low EAR (`< 0.21` held `>= 1.1 s`) | Descent guard (`lastEar >= 0.25`) + `>= 400 ms` suppression stops native `face.blinking` from firing during long closures | Toggles pause / resume cleanly without advancing beat (`4` live pauses verified) |
 | **Horizontal Gaze (`L / C / R`)** | Iris centers (`468`, `473`) + nose/cheek `yawRatio` | Additive deviation around center (`0.5 + irisDelta * 0.95 + yawDelta * 0.55`), `< 0.455 / > 0.545` with return hysteresis | Shifts sharp panel (`420 ms` crossfade), parallax depth, zone captions, and stereo WebAudio pan |
-| **Chest Breath Steadiness** | `breathing.upperTrace` + `breathing.rate` + `face.talking` | `4.5 s` OLS linear detrend + 2nd-diff curvature steadiness + `>= 5`-frame talking onset (`900 ms` hold) guard | Clears SVG blur (`feGaussianBlur`), slows drift velocity, swells pink-noise bed; `>= 60%` rings chime & reveals hidden note |
+| **Chest Breath Steadiness** | `breathing.upperTrace` + `breathing.rate` + `face.talking` | `4.5 s` OLS linear detrend + 2nd-diff curvature steadiness + `>= 5`-frame talking onset (`900 ms` hold) guard (`807/807` checks live) | Clears SVG blur (`feGaussianBlur`), slows drift velocity, swells pink-noise bed; `>= 60%` rings chime & reveals hidden note |
 | **Subtle Tonal Echo** | `face.expression` (`HAPPY`, `SAD`, `FEAR`, `ANGRY`, `NEUTRAL`) | `0.82/0.18` warm (`>= 45%`), `0.90/0.10` heavy (`>= 86%`) EMA to tolerate downward laptop camera angles | Subtle color temperature & ambient chord detune (`neutral` / `warm` / `heavy`) |
 | **Optical Pulse (Opt-in)** | `cardio.pulseRate` (`cardioMetrics`, **OFF by default**) | Confidence-gated (`>= 40%`, else `null`); never steers scene timing or unlocks | Displayed read-only on `/calibrate` and `/contact-sheet` only when explicitly toggled ON |
 
 ---
 
-## Sitting 1 vs. Sitting 2 Calibration Progression
+## Sitting 1 → Sitting 2 → Sitting 3 Calibration Progression
 
 | Run | Duration & Frames | Breath Clarity | Gaze Split (`L / C / R`) | Notes Unlocked | What Broke / What Fixed It |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Pre-flight probe** | `0 s` (`kInputUnavailable`) | — | — | — | `CameraSelection.front` failed on Windows MediaFoundation; `checkDeviceReadiness()` stalled for 30 s. Switched directly to `CameraSelection.default` / `.byId()` (`~7 s` lock at `29–31 Hz`). |
 | **Sitting 1** *(broken pipeline)* | `151.4 s`, `15` blink cuts | Froze at `55%` on startup (`67%` after clearing) | **100% Center** (`0.486–0.493`) | `15/15` | 30 Hz `availableCameras()` + `validationStatus` storm starved React; 1-frame startup `face.talking` froze `55%`; `0.7*iris + 0.3*yaw` pinned gaze at Center. |
-| **Sitting 2** *(calibrated, exported above)* | **`205.5 s`**, **`366` keyframes** (`308` `breathRate` msgs) | **`63%` 5-plate avg** (`63.9%` trace mean, `37–85%`) | **`91` Left / `235` Center / `40` Right** | **`11/15`** (`3,3,1,1,3`) | Cached camera list, deduplicated status broadcasts, `>= 5`-frame talking guard, OLS detrending, additive iris+yaw deviation (`0.95 / 0.55`). `26` raw blinks → `11` early ripples + `15` cuts. |
+| **Sitting 2** *(silent calibrated)* | `205.5 s`, `366` keyframes (`308` `breathRate` msgs) | `63%` 5-plate avg (`63.9%` trace mean, `37–85%`) | `91` Left / `235` Center / `40` Right | `11/15` (`3,3,1,1,3`) | Cached camera list, deduplicated status broadcasts, `>= 5`-frame talking guard, OLS detrending, additive iris+yaw deviation (`0.95 / 0.55`). `26` raw blinks → `11` early ripples + `15` cuts. |
+| **Sitting 3** *(narrated demo capture, exported above)* | **`239.2 s` essay / `352.4 s` `670` keyframes** (`9,827` 30 Hz msgs at `29.5 fps`, `523` `breathRate` msgs) | **`72%` 5-plate avg** (`72.4%` trace mean, `45–89%`) | **`171` Left / `406` Center / `93` Right** | **`15/15`** + opt-in **`75.4 bpm`** (`71.8 / 77.1 / 77.2`) | Proven live: **`807/807`** talking-guard freeze checks across **`15`** speaking episodes (`57` talking keyframes, `0` violations), **`64`** raw blinks (`30` early ripples + `34` armed across `352.4 s` / `15` essay cuts), opt-in pulse honestly `null` `< 40%` on Plates I & V, and **`4`** long-blink pauses exposing the **`42 ms`** eyelid-descent race (`dt = 289.947 s`, `ear = 0.213`, fixed + Regression Test #21). |
 
 <p align="center">
   <img src="./web/public/contact-sheet-run1-center-locked.png" alt="Sitting 1 Contact Sheet showing 100% solid blue Center gaze bars prior to additive iris+yaw fix" width="760" />
 </p>
-<p align="center"><em>Sitting 1 (151.4 s) before the additive iris + yaw fix: all five bottom gaze bars are flat cobalt Center. Compare with Sitting 2 at the top (91 Left / 235 Center / 40 Right).</em></p>
+<p align="center"><em>Sitting 1 (151.4 s) before the additive iris + yaw fix: all five bottom gaze bars are flat cobalt Center. Compare with Sitting 3 at the top (171 Left / 406 Center / 93 Right).</em></p>
+
+<p align="center">
+  <img src="./web/public/contact-sheet-solar-coral.png" alt="Solar Coral dark theme Contact Sheet showing 194.7s, 57% breath clarity, and honest dashed flatlines on Plates II to IV when chest waves stalled" width="760" />
+</p>
+<p align="center"><em>Dark-theme <strong>Solar Coral</strong> Contact Sheet from an earlier rehearsal take (194.7 s, 57% breath clarity): dashed gray baselines on Plates II–IV (0/3 notes) reflect honest signal loss when chest wave stalled, compared against active emerald respiratory waves on Plates I and V (2/3).</em></p>
 
 ---
 
@@ -79,7 +85,7 @@ npm --prefix web install
 cp .env.example .env
 # Edit .env -> SMARTSPECTRA_API_KEY=...
 
-npm run check   # Runs 20 SignalProcessor unit tests, trace/privacy verifier, and frontend build
+npm run check   # Runs 21 SignalProcessor unit tests, trace/privacy verifier, and frontend build
 npm start       # Starts local SmartSpectra WebSocket bridge + static UI on http://127.0.0.1:4199
 ```
 
@@ -96,23 +102,22 @@ npm run verify-trace                                       # Assert all counts &
 
 Live deployment: **https://afterimage-presage.vercel.app**
 
-Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, browsers cannot run it directly. When `127.0.0.1:4199` is absent, [vercel.json](./vercel.json) serves the SPA directly into **Recorded Sample Trace** mode (`366` keyframes from [`web/public/sample-trace.json`](./web/public/sample-trace.json) at 1× pace) plus **Keyboard Interactive** mode (`Space` = Blink Cut, `←/↑/→` = Gaze, `Shift` / slider = Breath).
+Because `@smartspectra/node-sdk` is a native desktop C++/FFI addon, browsers cannot run it directly. When `127.0.0.1:4199` is absent, [vercel.json](./vercel.json) serves the SPA directly into **Recorded Sample Trace** mode (`670` keyframes across `352.4 s` from [`web/public/sample-trace.json`](./web/public/sample-trace.json) at 1× pace) plus **Keyboard Interactive** mode (`Space` = Blink Cut, `←/↑/→` = Gaze, `Shift` / slider = Breath).
 
 ---
 
 ## Architecture & Empirical Notes
 
-- [`bridge/signal-processor.mjs`](./bridge/signal-processor.mjs) — Scale-invariant EAR blink-on-reopen (`< 650 ms`), `1.1 s` long-blink pause, `>= 5`-frame talking onset & `900 ms` hold guard, additive iris+yaw deviation gaze (`91 / 235 / 40`), `4.5 s` OLS-detrended chest-breath steadiness, calibrated `SAD` echo EMA, confidence-gated (`>= 40%`) opt-in pulse, and `[0..1]` silhouette extraction.
+- [`bridge/signal-processor.mjs`](./bridge/signal-processor.mjs) — Scale-invariant EAR blink-on-reopen (`< 650 ms`), `1.1 s` long-blink pause with `0.25` EAR native-descent guard, `>= 5`-frame talking onset & `900 ms` hold guard, additive iris+yaw deviation gaze (`171 / 406 / 93`), `4.5 s` OLS-detrended chest-breath steadiness, calibrated `SAD` echo EMA, confidence-gated (`>= 40%`) opt-in pulse, and `[0..1]` silhouette extraction.
 - [`bridge/server.mjs`](./bridge/server.mjs) — Serialized-mutex localhost HTTP + WebSocket bridge with cached camera enumeration, deduplicated `(validation, validationHint)` broadcasts, `enableTelemetry: false`, and JSONL / `sample-trace.json` recording.
-- [`scripts/verify-trace.mjs`](./scripts/verify-trace.mjs) — Deterministic verifier checking every published trace count (`366` frames, `91 / 235 / 40`, `63.9%` avg, `26 → 11 / 15` blinks, `308` breath rates) and privacy invariants (`enableTelemetry: false`, no `requestInsight()` calls), run on every push in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml).
-- [`docs/SDK-NOTES.md`](./docs/SDK-NOTES.md) — Detailed engineering notes covering all 8 Windows hardware/SDK findings and §7.4 verification.
+- [`scripts/verify-trace.mjs`](./scripts/verify-trace.mjs) — Deterministic verifier checking every published trace count (`670` frames, `171 / 406 / 93`, `72.4%` avg, `57` talking frames, `81` opt-in pulse frames `67.5–85.5 bpm`, `64 → 30 / 34` blinks, `523` breath rates) and privacy invariants (`enableTelemetry: false`, no `requestInsight()` calls), run on every push in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml).
+- [`docs/SDK-NOTES.md`](./docs/SDK-NOTES.md) — Detailed engineering notes covering all 10 Windows hardware/SDK findings and §7.4 verification.
 
 ---
 
 ## Honest Limits
 
 - Tested by one participant (`@emarc99`) on a single Windows x64 laptop webcam (`USB\VID_13D3&PID_5415`) in indoor room lighting; not yet tested on macOS, Linux, or across Fitzpatrick V–VI skin tones.
-- Because Sitting 2 was read silently, `talking` was `false` across all `366` keyframes in `sample-trace.json`; the `>= 5`-frame speech guard is verified via Sitting 1's startup bug diagnosis and unit tests rather than a spoken trace.
 - No wire-level TCP packet capture was run against Presage's Analytics Gateway; Consent disclosures state strictly what `@smartspectra/node-sdk@3.5.0` source code and Presage's docs specify.
 
 ---

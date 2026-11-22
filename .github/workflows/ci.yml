@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Install web dependencies
         run: npm --prefix web ci
-      - name: Run SignalProcessor unit tests (20 tests)
+      - name: Run SignalProcessor unit tests (21 tests)
         run: npm test
       - name: Verify recorded sample trace and SDK privacy invariants
         run: npm run verify-trace

@@ -120,6 +120,7 @@ export class SignalProcessor {
   constructor(options = {}) {
     this.mirrorX = options.mirrorX ?? true;
     this.earBlinkThreshold = options.earBlinkThreshold ?? 0.21;
+    this.nativeBlinkEarFloor = options.nativeBlinkEarFloor ?? 0.25;
     this.minBlinkGapMs = options.minBlinkGapMs ?? 360;
     this.maxQuickBlinkMs = options.maxQuickBlinkMs ?? 650;
     this.longBlinkMs = options.longBlinkMs ?? 1100;
@@ -220,15 +221,18 @@ export class SignalProcessor {
       }
     }
 
-    // 2. SmartSpectra native blinking onset pulses (suppressed while holding eyes closed >=400ms or mid-closure)
+    // 2. SmartSpectra native blinking onset pulses (suppressed during eyelid descent <0.25 EAR or closure >=400ms)
     const closedElapsed =
       this.eyesClosedSinceMs !== null
         ? Math.max(closedDurationOnFrame, nowMs - this.eyesClosedSinceMs)
         : closedDurationOnFrame;
+    const nativeEarClear =
+      this.lastEar === null || this.lastEar >= this.nativeBlinkEarFloor;
     for (const b of m.face?.blinking || []) {
       if (b?.detected) {
         if (
           !this.wasLowEar &&
+          nativeEarClear &&
           !this.longBlinkFired &&
           closedElapsed < 400 &&
           nowMs - this.lastBlinkEmitMs >= this.minBlinkGapMs

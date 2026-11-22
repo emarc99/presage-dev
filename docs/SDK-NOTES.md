@@ -1,6 +1,6 @@
 # Windows Hardware & `@smartspectra/node-sdk@3.5.0` Engineering Notes
 
-All measurements below were observed on Windows x64 (`Node v24.9.0`, integrated laptop camera `USB\VID_13D3&PID_5415` at `960×540 @ 30fps`) while calibrating AFTERIMAGE across two full live sittings (`Sitting 1`: `151.4 s`; `Sitting 2`: `205.5 s`, `366` keyframes saved in [`web/public/sample-trace.json`](../web/public/sample-trace.json)).
+All measurements below were observed on Windows x64 (`Node v24.9.0`, integrated laptop camera `USB\VID_13D3&PID_5415` at `960×540 @ 30fps`) while calibrating AFTERIMAGE across three full live sittings (`Sitting 1`: `151.4 s`; `Sitting 2`: `205.5 s`, `366` keyframes silent; `Sitting 3`: `239.2 s` exported essay / `352.4 s` narrated capture, `670` keyframes saved in [`web/public/sample-trace.json`](../web/public/sample-trace.json)).
 
 ---
 
@@ -45,3 +45,10 @@ All measurements below were observed on Windows x64 (`Node v24.9.0`, integrated 
 - Inspection of `node_modules/@smartspectra/node-sdk/js/smartspectra.js` (`_ensureSession()`) shows every SDK session registers `onInsight`.
 - Per [Presage's LLM Insights docs](https://smartspectra.presagetech.com/docs/llm-insights) and Privacy Policy §7.4, when `breathing` (including `breathing.rate`) or `cardio` metrics are enabled, the SDK automatically dispatches buffered derived numeric series (`breathing.rate`, plus `pulse`/`HRV` when cardio is enabled — never raw video) to Presage's Analytics Gateway / Anthropic LLM service, which cannot currently be disabled by developers.
 - AFTERIMAGE keeps `enableTelemetry: false`, never calls `sdk.requestInsight()`, and keeps `cardioMetrics` **OFF by default** so pulse/HRV are never computed or buffered unless the user explicitly flips the toggle after reading the disclosure on `/calibrate`.
+
+---
+
+## 10. Sitting 3 Narrated Telemetry: 42 ms `face.blinking` Descent Race, `807 / 807` Talking Guard & Opt-In Pulse Suppression
+- **Live speech guard verification (`807 / 807`, `0` violations):** Across `15` speaking episodes (`822` talking packets in the `9,827`-packet 30 Hz capture averaging `29.5 fps`, `57` keyframes in `web/public/sample-trace.json`), `breathSteadiness` stayed locked across all `807` consecutive talking-frame transitions with `0` drift violations.
+- **42 ms eyelid-descent race (`dt = 289.947 s`):** Out of `4` deliberate `longBlinkPause` pauses (`157.86 s`, `259.14 s`, `291.11 s`, `320.69 s`), pause #3 revealed a race where SmartSpectra's native `face.blinking` fired at `dt = 289.947 s` (`ear = 0.213`, just `0.003` above `earBlinkThreshold = 0.21`) **42 ms before** `ear` dropped to `0.175` at `289.989 s` for a `2.44 s` closure (`longBlinkPause` fired at `291.114 s`, reopened cleanly at `292.424 s` with `ear = 0.253`). Fixed in [`bridge/signal-processor.mjs`](../bridge/signal-processor.mjs) by gating native `face.blinking` fallback on `lastEar === null || lastEar >= 0.25` (`nativeBlinkEarFloor`), verified by Regression Test #21 in [`bridge/signal-processor.test.mjs`](../bridge/signal-processor.test.mjs).
+- **Live opt-in `cardioMetrics` confidence gating (`>= 40%`):** Toggled ON mid-sitting (`dt = 264.6 s` first confident reading `75.6 bpm`, `conf = 51`; `81` keyframes in `sample-trace.json`, `67.5–85.5 bpm`, `76.6 bpm` mean). On the exported `239.2 s` Contact Sheet PNG, Plates II–IV printed `71.8 / 77.1 / 77.2 bpm` (`AVG PULSE 75.4 BPM (§7.4)`), while Plate I (pre-toggle) and Plate V (extreme left glance dropping rPPG confidence below `40%`) stayed honestly suppressed (`null`).

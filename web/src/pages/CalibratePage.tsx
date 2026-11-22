@@ -5,7 +5,7 @@ import type { SignalSource } from '../types/signals';
 
 const SOURCES: { id: SignalSource; label: string; hint: string }[] = [
   { id: 'bridge', label: 'Live Bridge (ws://4199)', hint: 'Uses your local webcam via SmartSpectra SDK.' },
-  { id: 'sample', label: 'Recorded Sample Trace', hint: 'Replays a real 366-frame Windows SmartSpectra sitting.' },
+  { id: 'sample', label: 'Recorded Sample Trace', hint: 'Replays a real 670-frame Windows SmartSpectra sitting.' },
   { id: 'keyboard', label: 'Keyboard Interactive', hint: 'Control blinks (Space), gaze (arrows), breath slider.' },
 ];
 

@@ -13,15 +13,15 @@ const calibratePath = path.join(ROOT, 'web', 'src', 'pages', 'CalibratePage.tsx'
 const trace = JSON.parse(fs.readFileSync(tracePath, 'utf8'));
 assert.equal(trace.kind, 'recorded_sitting', 'sample trace kind must be recorded_sitting');
 assert.ok(Array.isArray(trace.frames), 'sample trace must contain frames array');
-assert.equal(trace.frames.length, 366, 'expected 366 recorded keyframes');
+assert.equal(trace.frames.length, 670, 'expected 670 recorded keyframes');
 
 const frames = trace.frames;
 const firstT = frames[0].t;
 const lastT = frames[frames.length - 1].t;
 const span = Number((lastT - firstT).toFixed(2));
-assert.equal(firstT, 11.33);
-assert.equal(lastT, 213.28);
-assert.equal(span, 201.95);
+assert.equal(firstT, 0.02);
+assert.equal(lastT, 352.42);
+assert.equal(span, 352.4);
 
 const gazeCounts = { left: 0, center: 0, right: 0 };
 const echoCounts = { neutral: 0, warm: 0, heavy: 0 };
@@ -31,6 +31,10 @@ let minStead = Infinity;
 let maxStead = -Infinity;
 let ge60 = 0;
 let talkingCount = 0;
+let pulseCount = 0;
+let minPulse = Infinity;
+let maxPulse = -Infinity;
+let pulseSum = 0;
 let rawBlinks = 0;
 
 // Reproduce the ExperiencePage 4.2s Shutter Armed dwell gate over the recorded trace timestamps
@@ -48,6 +52,12 @@ for (const f of frames) {
   if (f.breathSteadiness > maxStead) maxStead = f.breathSteadiness;
   if (f.breathSteadiness >= 60) ge60 += 1;
   if (f.talking) talkingCount += 1;
+  if (typeof f.pulseRate === 'number') {
+    pulseCount += 1;
+    if (f.pulseRate < minPulse) minPulse = f.pulseRate;
+    if (f.pulseRate > maxPulse) maxPulse = f.pulseRate;
+    pulseSum += f.pulseRate;
+  }
   if (f.blinkCut) {
     rawBlinks += 1;
     if (f.t - lastCutT >= SHUTTER_ARM_SEC) {
@@ -61,19 +71,24 @@ for (const f of frames) {
 
 const avgStead = Number((steadinessSum / frames.length).toFixed(1));
 const pctGe60 = Number(((100 * ge60) / frames.length).toFixed(1));
+const avgPulse = Number((pulseSum / pulseCount).toFixed(1));
 
-assert.deepEqual(gazeCounts, { left: 91, center: 235, right: 40 });
-assert.deepEqual(echoCounts, { neutral: 182, warm: 0, heavy: 184 });
-assert.equal(breathRateCount, 308);
-assert.equal(minStead, 37);
-assert.equal(maxStead, 85);
-assert.equal(avgStead, 63.9);
-assert.equal(ge60, 233);
-assert.equal(pctGe60, 63.7);
-assert.equal(talkingCount, 0);
-assert.equal(rawBlinks, 26);
-assert.equal(armedCuts, 15);
-assert.equal(suppressedEarly, 11);
+assert.deepEqual(gazeCounts, { left: 171, center: 406, right: 93 });
+assert.deepEqual(echoCounts, { neutral: 480, warm: 0, heavy: 190 });
+assert.equal(breathRateCount, 523);
+assert.equal(minStead, 45);
+assert.equal(maxStead, 89);
+assert.equal(avgStead, 72.4);
+assert.equal(ge60, 493);
+assert.equal(pctGe60, 73.6);
+assert.equal(talkingCount, 57);
+assert.equal(pulseCount, 81);
+assert.equal(minPulse, 67.5);
+assert.equal(maxPulse, 85.5);
+assert.equal(avgPulse, 76.6);
+assert.equal(rawBlinks, 64);
+assert.equal(armedCuts, 34);
+assert.equal(suppressedEarly, 30);
 
 // Verify SDK privacy invariants in bridge/server.mjs & UI copy consistency
 const serverSrc = fs.readFileSync(serverPath, 'utf8');
@@ -100,6 +115,7 @@ console.log(
       breathRateCount,
       breathSteadiness: { min: minStead, max: maxStead, avg: avgStead, ge60, pctGe60 },
       talkingCount,
+      pulse: { count: pulseCount, min: minPulse, max: maxPulse, avg: avgPulse },
       blinks: { raw: rawBlinks, armedCuts, suppressedEarly },
     },
     null,

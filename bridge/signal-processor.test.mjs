@@ -534,3 +534,32 @@ test('Server privacy contract: enableTelemetry stays false, cardio defaults off,
   assert.match(src, /let activeEnableCardio = false;/);
   assert.ok(!src.includes('requestInsight('));
 });
+
+test('Sitting 3 regression: native blinking on eyelid descent (ear 0.213 -> 0.175) does not misfire before longBlinkPause', () => {
+  const proc = new SignalProcessor();
+  const frame = (ear, blinking = false) => ({
+    face: {
+      landmarks: [{ value: makeFaceLandmarks({ ear }) }],
+      ...(blinking ? { blinking: [{ detected: true }] } : {}),
+    },
+  });
+
+  // Establish 0.321 EAR open baseline, then descent frame 289.947s with ear=0.213 + native blinking=true
+  assert.equal(proc.process(frame(0.321), 289913).blinkCut, false);
+  const descent = proc.process(frame(0.213, true), 289947);
+  assert.equal(descent.blinkCut, false);
+
+  // Full closure at 289.989s held past 1100ms fires longBlinkPause at 291.114s, zero blinkCut on reopen
+  assert.equal(proc.process(frame(0.175), 289989).blinkCut, false);
+  const pause = proc.process(frame(0.151), 291114);
+  assert.equal(pause.longBlinkPause, true);
+  assert.equal(pause.blinkCut, false);
+
+  const closing = proc.process(frame(0.209), 292378);
+  assert.equal(closing.blinkCut, false);
+  assert.equal(closing.longBlinkPause, false);
+
+  const reopen = proc.process(frame(0.253), 292424);
+  assert.equal(reopen.blinkCut, false);
+  assert.equal(reopen.longBlinkPause, false);
+});
